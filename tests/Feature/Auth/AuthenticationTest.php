@@ -21,6 +21,7 @@ class AuthenticationTest extends TestCase
         $user = User::factory()->create([
             'username' => 'siswa_test',
             'email_verified_at' => now(),
+            'role' => 'siswa',
         ]);
 
         $response = $this->post('/login', [
@@ -29,7 +30,7 @@ class AuthenticationTest extends TestCase
         ]);
 
         $this->assertAuthenticated();
-        $response->assertRedirect(route('dashboard', absolute: false));
+        $response->assertRedirect(route('pendaftaran.index', absolute: false));
     }
 
     public function test_users_can_authenticate_using_email(): void
@@ -37,10 +38,29 @@ class AuthenticationTest extends TestCase
         $user = User::factory()->create([
             'email' => 'siswa@test.com',
             'email_verified_at' => now(),
+            'role' => 'siswa',
         ]);
 
         $response = $this->post('/login', [
             'login' => 'siswa@test.com',
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect(route('pendaftaran.index', absolute: false));
+    }
+
+    public function test_admin_user_is_redirected_to_dashboard_after_login(): void
+    {
+        $admin = User::factory()->create([
+            'username' => 'admin_test',
+            'email' => 'admin@test.com',
+            'email_verified_at' => now(),
+            'role' => 'admin',
+        ]);
+
+        $response = $this->post('/login', [
+            'login' => 'admin_test',
             'password' => 'password',
         ]);
 

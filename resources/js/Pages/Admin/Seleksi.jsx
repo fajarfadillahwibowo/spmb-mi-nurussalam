@@ -3,6 +3,8 @@ import { Head, Link, router } from '@inertiajs/react';
 import React, { useState, useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import WaStatusBadge from '@/Components/WaStatusBadge';
+import EmailStatusBadge from '@/Components/EmailStatusBadge';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -187,7 +189,25 @@ export default function Seleksi({ pendaftarans, filters, status }) {
                                             <td className="px-6 py-4 font-semibold">{item.nama_orang_tua}</td>
                                             <td className="px-6 py-4 font-semibold">{item.no_hp_wali}</td>
                                             <td className="px-6 py-4 font-semibold">{formatDate(item.created_at)}</td>
-                                            <td className="px-6 py-4 text-center">{statusBadge(item.status)}</td>
+                                            <td className="px-6 py-4 text-center">
+                                                <div className="flex flex-col items-center gap-1">
+                                                    {statusBadge(item.status)}
+                                                    {item.status === 'lulus' && (
+                                                        <>
+                                                            <WaStatusBadge
+                                                                status={item.status_wa_lulus || 'belum_terkirim'}
+                                                                sentAt={item.wa_lulus_sent_at}
+                                                                className="mt-0.5"
+                                                            />
+                                                            <EmailStatusBadge
+                                                                status={item.status_email_lulus || 'belum_terkirim'}
+                                                                sentAt={item.email_lulus_sent_at}
+                                                                className="mt-0.5"
+                                                            />
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
                                             <td className="px-6 py-4 text-center">
                                                 <Link
                                                     href={route('seleksi.show', item.id)}

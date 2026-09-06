@@ -155,11 +155,17 @@ export default function Dashboard({ auth, role, pendaftaran, stats, teksPengumum
         pendaftaran?.dokumen?.kartu_keluarga_path &&
         pendaftaran?.dokumen?.identitas_ortu_path
     );
-    const hasPembayaran = !!(pendaftaran?.pembayaran?.bukti_pembayaran_path);
+    // bukti_pembayaran_path & payment_status ada langsung di tabel pendaftaran
+    const hasPembayaran = !!(
+        pendaftaran?.bukti_pembayaran_path ||
+        (pendaftaran?.payment_status && pendaftaran?.payment_status !== 'belum_bayar')
+    );
     const status = pendaftaran?.status || 'belum_daftar';
+    // Pengumuman dianggap selesai jika hasil seleksi sudah ditetapkan
+    const hasPengumuman = status === 'lulus' || status === 'tidak_lulus';
     const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.belum_daftar;
 
-    // completion percentage
+    // completion percentage — 4 tahap sesuai visual Alur Pendaftaran
     const steps = [true, hasBio, hasDocs, hasPembayaran];
     const completedSteps = steps.filter(Boolean).length;
     const progressPct = Math.round((completedSteps / steps.length) * 100);
@@ -543,6 +549,7 @@ export default function Dashboard({ auth, role, pendaftaran, stats, teksPengumum
                                 />
                                 <QuickActionCard
                                     href={route('pengumuman.index')}
+                                    active={hasPengumuman}
                                     title="Pengumuman"
                                     desc="Pantau informasi dan pengumuman"
                                     icon={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-5 w-5"><path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a9.04 9.04 0 0 1-5.714 0M3.181 12.062a18.8 18.8 0 0 1 17.638 0M15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm1.89 3.487A9.04 9.04 0 0 1 12 15a9.04 9.04 0 0 1-4.89-1.513M21 12v6.75A2.25 2.25 0 0 1 18.75 21H5.25A2.25 2.25 0 0 1 3 18.75V12" /></svg>}

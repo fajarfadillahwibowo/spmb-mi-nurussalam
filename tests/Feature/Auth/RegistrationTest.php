@@ -45,4 +45,20 @@ class RegistrationTest extends TestCase
         // Check if OTP mail notification was dispatched
         Notification::assertSentTo($user, SendVerificationCode::class);
     }
+
+    public function test_registration_fails_if_password_less_than_8_characters(): void
+    {
+        $response = $this->post('/register', [
+            'username'              => 'user_pendek',
+            'email'                 => 'pendek@gmail.com',
+            'password'              => '1234567', // 7 karakter (< 8)
+            'password_confirmation' => '1234567',
+        ]);
+
+        $response->assertSessionHasErrors(['password']);
+        $this->assertGuest();
+        $this->assertDatabaseMissing('users', [
+            'username' => 'user_pendek',
+        ]);
+    }
 }

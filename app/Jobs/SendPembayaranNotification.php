@@ -127,11 +127,20 @@ class SendPembayaranNotification implements ShouldQueue
         }
 
         if (! $result['success']) {
+            $this->pendaftaran->update([
+                'status_wa_bayar' => 'belum_terkirim',
+            ]);
+
             // Lempar exception agar Queue Worker memasukkan Job ke antrian retry.
             throw new \RuntimeException(
                 "[WA Pembayaran Job] Gagal kirim ke {$noHpWali}: {$result['message']}"
             );
         }
+
+        $this->pendaftaran->update([
+            'status_wa_bayar'  => 'terkirim',
+            'wa_bayar_sent_at' => now(),
+        ]);
 
         Log::info('[WA Pembayaran Job] Sukses dikirim.', [
             'pendaftaran_id' => $this->pendaftaran->id,
@@ -154,6 +163,10 @@ class SendPembayaranNotification implements ShouldQueue
      */
     public function failed(\Throwable $exception): void
     {
+        $this->pendaftaran->update([
+            'status_wa_bayar' => 'belum_terkirim',
+        ]);
+
         Log::error('[WA Pembayaran Job] GAGAL TOTAL setelah semua retry.', [
             'pendaftaran_id' => $this->pendaftaran->id,
             'nama'           => $this->pendaftaran->nama_lengkap,

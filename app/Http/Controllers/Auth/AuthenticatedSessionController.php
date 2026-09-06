@@ -43,6 +43,11 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        // Jika user adalah calon siswa, arahkan pertama kali ke halaman Pendaftaran (isi biodata)
+        if (Auth::user()->role === 'siswa') {
+            return redirect()->intended(route('pendaftaran.index', absolute: false));
+        }
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
 

@@ -459,4 +459,105 @@ class DokumenControllerTest extends TestCase
 
         $response->assertRedirect(route('login'));
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  METHOD: hapusDokumenAdmin()
+    // ═══════════════════════════════════════════════════════════════
+
+    public function test_admin_can_delete_single_document(): void
+    {
+        Storage::fake('public');
+        $admin = $this->makeAdmin();
+        $siswa = $this->makeSiswa();
+        $pendaftaran = $this->makePendaftaran($siswa, ['status' => 'menunggu_verifikasi']);
+
+        $kkPath = 'dokumen/test_kk.pdf';
+        Storage::disk('public')->put($kkPath, 'dummy kk');
+
+        Dokumen::create([
+            'pendaftaran_id'      => $pendaftaran->id,
+            'akta_kelahiran_path' => 'dokumen/akta.jpg',
+            'kartu_keluarga_path' => $kkPath,
+            'identitas_ortu_path' => 'dokumen/ktp.jpg',
+            'ijazah_path'         => 'dokumen/ijazah.pdf',
+            'pkh_kks_path'        => '',
+        ]);
+
+        Storage::disk('public')->assertExists($kkPath);
+
+        $response = $this->actingAs($admin)->post(route('verifikasi-berkas.hapus-dokumen', $pendaftaran->id), [
+            'doc_type' => 'kartu_keluarga_path',
+        ]);
+
+        $response->assertRedirect(route('verifikasi-berkas.index'));
+        Storage::disk('public')->assertMissing($kkPath);
+
+        $pendaftaran->refresh();
+        $this->assertEquals('', $pendaftaran->dokumen->kartu_keluarga_path);
+        $this->assertEquals('belum_lengkap', $pendaftaran->status);
+
+        // Verifikasi notifikasi in-app tersimpan untuk siswa
+        $this->assertDatabaseHas('notifikasis', [
+            'user_id' => $siswa->id,
+            'title'   => '📄 Dokumen Dihapus oleh Admin',
+        ]);
+    }
+
+    public function test_non_admin_cannot_delete_document(): void
+    {
+        $siswa = $this->makeSiswa();
+        $pendaftaran = $this->makePendaftaran($siswa);
+
+        $response = $this->actingAs($siswa)->post(route('verifikasi-berkas.hapus-dokumen', $pendaftaran->id), [
+            'doc_type' => 'kartu_keluarga_path',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  METHOD: kirimPemberitahuan()
+    // ═══════════════════════════════════════════════════════════════
+
+    public function test_admin_can_send_document_revision_notification(): void
+    {
+        Storage::fake('public');
+        $admin = $this->makeAdmin();
+        $siswa = $this->makeSiswa();
+        $pendaftaran = $this->makePendaftaran($siswa, ['status' => 'menunggu_verifikasi']);
+
+        $aktaPath = 'dokumen/test_akta.jpg';
+        Storage::disk('public')->put($aktaPath, 'dummy akta');
+
+        Dokumen::create([
+            'pendaftaran_id'      => $pendaftaran->id,
+            'akta_kelahiran_path' => $aktaPath,
+            'kartu_keluarga_path' => 'dokumen/kk.pdf',
+            'identitas_ortu_path' => 'dokumen/ktp.jpg',
+            'ijazah_path'         => 'dokumen/ijazah.pdf',
+            'pkh_kks_path'        => '',
+        ]);
+
+        $response = $this->actingAs($admin)->post(route('verifikasi-berkas.kirim-pemberitahuan', $pendaftaran->id), [
+            'pesan'              => 'Foto akta kelahiran buram. Mohon unggah ulang.',
+            'dokumen_bermasalah' => ['akta_kelahiran_path'],
+            'hapus_file'         => true,
+            'kirim_wa'           => false,
+        ]);
+
+        $response->assertRedirect(route('verifikasi-berkas.index'));
+        Storage::disk('public')->assertMissing($aktaPath);
+
+        $pendaftaran->refresh();
+        $this->assertEquals('', $pendaftaran->dokumen->akta_kelahiran_path);
+        $this->assertEquals('belum_lengkap', $pendaftaran->status);
+
+        // Verifikasi notifikasi in-app tersimpan di tabel notifikasis untuk siswa
+        $this->assertDatabaseHas('notifikasis', [
+            'user_id' => $siswa->id,
+            'title'   => '⚠️ Perbaikan Berkas Diperlukan',
+            'message' => 'Foto akta kelahiran buram. Mohon unggah ulang.',
+            'link_url'=> '/dokumen',
+        ]);
+    }
 }

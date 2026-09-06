@@ -12,6 +12,7 @@ use Inertia\Response;
 
 // ─── Internal Imports ─────────────────────────────────────────────────────────
 use App\Models\Dokumen;
+use App\Models\Pendaftaran;
 
 /**
  * Controller Dokumen (Manajemen Dokumen Persyaratan)
@@ -180,5 +181,144 @@ class DokumenController extends Controller
         }
 
         return redirect()->route('dokumen.index')->with('error', 'Tidak ada file yang diunggah.');
+    }
+
+    /**
+     * Menghapus file dokumen tertentu milik calon siswa oleh admin.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Pendaftaran   $pendaftaran
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function hapusDokumenAdmin(Request $request, Pendaftaran $pendaftaran): RedirectResponse
+    {
+        if (Auth::user()->role !== 'admin') {
+            abort(403, 'Aksi ditolak.');
+        }
+
+        $request->validate([
+            'doc_type' => 'required|string|in:akta_kelahiran_path,kartu_keluarga_path,identitas_ortu_path,ijazah_path,pkh_kks_path',
+        ]);
+
+        $docType = $request->doc_type;
+        $dokumen = $pendaftaran->dokumen;
+
+        $docLabels = [
+            'akta_kelahiran_path' => 'Akta Kelahiran',
+            'kartu_keluarga_path' => 'Kartu Keluarga',
+            'identitas_ortu_path' => 'Identitas Orang Tua (KTP)',
+            'ijazah_path'         => 'Ijazah RA/TK',
+            'pkh_kks_path'        => 'Kartu PKH/KKS/Jaminan Sosial',
+        ];
+        $label = $docLabels[$docType] ?? 'Dokumen';
+
+        if ($dokumen && !empty($dokumen->$docType)) {
+            // Hapus file fisik dari storage
+            if (Storage::disk('public')->exists($dokumen->$docType)) {
+                Storage::disk('public')->delete($dokumen->$docType);
+            }
+            $dokumen->$docType = '';
+            $dokumen->save();
+        }
+
+        // Periksa apakah ada dokumen wajib yang sekarang menjadi kosong
+        $wajibLengkap = $dokumen
+            && $dokumen->akta_kelahiran_path
+            && $dokumen->kartu_keluarga_path
+            && $dokumen->identitas_ortu_path
+            && $dokumen->ijazah_path;
+
+        if (! $wajibLengkap) {
+            $pendaftaran->status = 'belum_lengkap';
+            $pendaftaran->save();
+        }
+
+        // Kirim notifikasi in-app ke calon siswa (masuk ke lonceng notifikasi)
+        if ($pendaftaran->user_id) {
+            \App\Helpers\NotifikasiHelper::kirimKePengguna(
+                userId:  $pendaftaran->user_id,
+                title:   '📄 Dokumen Dihapus oleh Admin',
+                message: "Berkas {$label} Anda telah dihapus oleh Admin panitia verifikasi karena tidak sesuai, rusak, atau buram. Silakan unggah kembali berkas yang valid melalui menu Unggah Dokumen.",
+                linkUrl: '/dokumen'
+            );
+        }
+
+        return redirect()->back(302, [], route('verifikasi-berkas.index'))
+            ->with('status', "Berkas {$label} milik {$pendaftaran->nama_lengkap} berhasil dihapus.");
+    }
+
+    /**
+     * Mengirim pemberitahuan perbaikan berkas / dokumen bermasalah ke calon siswa.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Pendaftaran   $pendaftaran
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function kirimPemberitahuan(Request $request, Pendaftaran $pendaftaran): RedirectResponse
+    {
+        if (Auth::user()->role !== 'admin') {
+            abort(403, 'Aksi ditolak.');
+        }
+
+        $request->validate([
+            'pesan'               => 'required|string|max:1000',
+            'dokumen_bermasalah'  => 'nullable|array',
+            'dokumen_bermasalah.*'=> 'string|in:akta_kelahiran_path,kartu_keluarga_path,identitas_ortu_path,ijazah_path,pkh_kks_path',
+            'hapus_file'          => 'nullable|boolean',
+            'kirim_wa'            => 'nullable|boolean',
+        ]);
+
+        $dokumen = $pendaftaran->dokumen;
+
+        // Jika admin memilih untuk langsung menghapus file dokumen yang bermasalah
+        if ($request->boolean('hapus_file') && !empty($request->dokumen_bermasalah) && $dokumen) {
+            foreach ($request->dokumen_bermasalah as $docType) {
+                if (!empty($dokumen->$docType)) {
+                    if (Storage::disk('public')->exists($dokumen->$docType)) {
+                        Storage::disk('public')->delete($dokumen->$docType);
+                    }
+                    $dokumen->$docType = '';
+                }
+            }
+            $dokumen->save();
+        }
+
+        // Set status pendaftaran menjadi belum_lengkap agar calon siswa diarahkan melengkapi
+        $pendaftaran->status = 'belum_lengkap';
+        $pendaftaran->save();
+
+        // 1. Kirim notifikasi in-app ke akun siswa (muncul di simbol lonceng pojok kanan atas)
+        if ($pendaftaran->user_id) {
+            \App\Helpers\NotifikasiHelper::kirimKePengguna(
+                userId:  $pendaftaran->user_id,
+                title:   '⚠️ Perbaikan Berkas Diperlukan',
+                message: $request->pesan,
+                linkUrl: '/dokumen'
+            );
+        }
+
+        // 2. Kirim notifikasi via WhatsApp jika opsi diaktifkan dan nomor wali tersedia
+        $waSent = false;
+        if ($request->boolean('kirim_wa') && !empty($pendaftaran->no_hp_wali)) {
+            try {
+                $waService = app(\App\Services\WhatsAppService::class);
+                $waMessage = \App\Services\WhatsAppService::buildPerbaikanDokumenMessage(
+                    $pendaftaran->nama_lengkap,
+                    $request->pesan
+                );
+                $waResult = $waService->send($pendaftaran->no_hp_wali, $waMessage);
+                $waSent = $waResult['success'] ?? false;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[VerifikasiBerkas] Gagal kirim WA perbaikan dokumen', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $feedbackMsg = 'Pemberitahuan perbaikan berkas berhasil dikirim ke calon siswa (tersedia di lonceng notifikasi akun siswa)'
+            . ($waSent ? ' dan pesan WhatsApp terkirim ke wali.' : '.');
+
+        return redirect()->back(302, [], route('verifikasi-berkas.index'))
+            ->with('status', $feedbackMsg);
     }
 }

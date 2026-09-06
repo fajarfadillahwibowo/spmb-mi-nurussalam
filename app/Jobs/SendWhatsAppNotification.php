@@ -76,10 +76,23 @@ class SendWhatsAppNotification implements ShouldQueue
         $result = $whatsApp->send($noHpWali, $pesan);
 
         if (! $result['success']) {
+            if ($this->statusSeleksi === 'lulus') {
+                $this->pendaftaran->update([
+                    'status_wa_lulus' => 'belum_terkirim',
+                ]);
+            }
+
             // Lempar exception agar Job di-retry otomatis sesuai backoff
             throw new \RuntimeException(
                 "[WhatsApp Job] Gagal kirim ke {$noHpWali}: {$result['message']}"
             );
+        }
+
+        if ($this->statusSeleksi === 'lulus') {
+            $this->pendaftaran->update([
+                'status_wa_lulus'  => 'terkirim',
+                'wa_lulus_sent_at' => now(),
+            ]);
         }
 
         Log::info('[WhatsApp Job] Selesai sukses', [
@@ -94,6 +107,12 @@ class SendWhatsAppNotification implements ShouldQueue
      */
     public function failed(\Throwable $exception): void
     {
+        if ($this->statusSeleksi === 'lulus') {
+            $this->pendaftaran->update([
+                'status_wa_lulus' => 'belum_terkirim',
+            ]);
+        }
+
         Log::error('[WhatsApp Job] GAGAL TOTAL setelah semua retry', [
             'pendaftaran_id' => $this->pendaftaran->id,
             'nama'           => $this->pendaftaran->nama_lengkap,

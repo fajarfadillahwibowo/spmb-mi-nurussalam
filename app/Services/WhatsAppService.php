@@ -213,4 +213,34 @@ class WhatsAppService
             . "Wassalamu'alaikum Wr. Wb.\n"
             . "-- Admin MI Nurussalam Sidogede";
     }
+
+    /**
+     * Build pesan WA untuk pemberitahuan perbaikan berkas / dokumen
+     */
+    public static function buildPerbaikanDokumenMessage(string $namaSiswa, string $catatan): string
+    {
+        return "Assalamu'alaikum Wr. Wb.\n\n"
+            . "Yth. Wali dari *{$namaSiswa}*,\n\n"
+            . "Panitia SPMB MI Nurussalam telah melakukan pemeriksaan berkas pendaftaran ananda.\n\n"
+            . "⚠️ *Pemberitahuan Perbaikan Dokumen:*\n"
+            . "{$catatan}\n\n"
+            . "Mohon untuk segera masuk ke akun website SPMB MI Nurussalam pada menu *Unggah Dokumen* untuk mengunggah ulang dokumen yang sesuai, jelas, dan valid.\n\n"
+            . "Wassalamu'alaikum Wr. Wb.\n"
+            . "-- Panitia SPMB MI Nurussalam Sidogede";
+    }
+
+    /**
+     * Build pesan WA untuk pemberitahuan perbaikan data diri / biodata
+     */
+    public static function buildPerbaikanBiodataMessage(string $namaSiswa, string $catatan): string
+    {
+        return "Assalamu'alaikum Wr. Wb.\n\n"
+            . "Yth. Wali dari *{$namaSiswa}*,\n\n"
+            . "Panitia SPMB MI Nurussalam telah memeriksa data formulir biodata pendaftaran ananda.\n\n"
+            . "📝 *Catatan Pembaruan Biodata:*\n"
+            . "{$catatan}\n\n"
+            . "Mohon untuk segera masuk ke akun website SPMB MI Nurussalam pada menu *Formulir Pendaftaran* untuk memperbarui data tersebut dengan benar.\n\n"
+            . "Wassalamu'alaikum Wr. Wb.\n"
+            . "-- Panitia SPMB MI Nurussalam Sidogede";
+    }
 }

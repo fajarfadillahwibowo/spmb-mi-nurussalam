@@ -27,6 +27,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -41,6 +42,7 @@ use App\Http\Controllers\SeleksiController;
 
 // ─── Job & Model Imports ──────────────────────────────────────────────────────
 use App\Jobs\SendPembayaranNotification;
+use App\Mail\KonfirmasiPembayaranMail;
 use App\Models\Pendaftaran;
 
 // ─── Pengaturan Module Imports (BARU — MODULAR) ───────────────────────────────
@@ -317,7 +319,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         }
 
         if ($search) {
-            $query->where('nama_lengkap', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->where('nama_lengkap', 'like', "%{$search}%")
+                  ->orWhere('nik', 'like', "%{$search}%");
+            });
         }
 
         if ($filterStatus) {
@@ -386,7 +391,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $dispatchWaJob   = false;
         $nominalBaru     = 0.0;
         $statusBaru      = $request->payment_status ?? 'belum_bayar';
-        $jenisPembayaran = $request->jenis_pembayaran ?: 'Biaya Pendaftaran SPMB';
+        $jenisPembayaran = $request->jenis_pembayaran ?: 'Total Biaya Masuk (Semua Komponen)';
 
         // ── DB::TRANSACTION (Prinsip Atomik) ───────────────────────────────────
         // Semua operasi database di dalam closure ini bersifat atomik.
@@ -450,30 +455,183 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->with('error', 'Terjadi kesalahan saat memperbarui data. Silakan coba lagi.');
         }
 
-        // ── DISPATCH WA JOB (Post-Commit) ──────────────────────────────────────
-        // Job hanya di-dispatch SETELAH DB::transaction SUKSES dan admin
-        // mengaktifkan notifikasi WA (default: aktif jika param tidak dikirim).
+        // ── PENGIRIMAN NOTIFIKASI WA & PELACAKAN STATUS ─────────────────────
+        $waStatusMsg = '';
         if ($dispatchWaJob && $request->boolean('kirim_notif_wa', true)) {
-            // Refresh model untuk memastikan data yang dikirim ke Job adalah
-            // data terbaru dari database (bukan dari memori closure di atas).
             $pendaftaran->refresh();
+            if (!empty($pendaftaran->no_hp_wali)) {
+                try {
+                    $waService = app(\App\Services\WhatsAppService::class);
+                    $nominalFmt  = 'Rp ' . number_format($nominalBaru, 0, ',', '.');
+                    $statusLabel = $statusBaru === 'lunas' ? 'LUNAS' : 'CICILAN';
+                    $appUrl      = config('app.url');
 
-            // $pdfUrl dapat diisi dengan URL kuitansi PDF jika fitur tersebut tersedia.
-            $pdfUrl = null;
+                    $pesan  = "Assalamu'alaikum Wr. Wb.\n\n"
+                        . "Yth. *{$pendaftaran->nama_lengkap}* / Wali Murid,\n\n"
+                        . "Kami informasikan bahwa pembayaran untuk:\n"
+                        . "🏷️ *Jenis:* {$jenisPembayaran}\n"
+                        . "💰 *Nominal:* {$nominalFmt}\n\n"
+                        . "Telah kami terima dan berstatus *{$statusLabel}*.\n\n"
+                        . ($statusBaru === 'lunas'
+                            ? "🎉 Selamat! Pembayaran Anda telah *LUNAS*.\n🔗 {$appUrl}/dashboard\n\n"
+                            : "Silakan lakukan pembayaran berikutnya sesuai ketentuan.\n\n")
+                        . "Wassalamu'alaikum Wr. Wb.\n-- *Admin MI Nurussalam Sidogede* --";
 
-            SendPembayaranNotification::dispatch(
-                $pendaftaran,
-                $jenisPembayaran,
-                $nominalBaru,
-                $statusBaru,
-                $pdfUrl,
-            );
+                    $waResult = $waService->send($pendaftaran->no_hp_wali, $pesan);
+
+                    if (!empty($waResult['success']) && $waResult['success'] === true) {
+                        $pendaftaran->update([
+                            'status_wa_bayar'  => 'terkirim',
+                            'wa_bayar_sent_at' => now(),
+                        ]);
+                        $waStatusMsg = ' (Status WA: Terkirim)';
+                    } else {
+                        $pendaftaran->update([
+                            'status_wa_bayar' => 'belum_terkirim',
+                        ]);
+                        $waStatusMsg = ' (Status WA: Belum Terkirim)';
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('[Pembayaran Konfirmasi] Gagal kirim WA', ['error' => $e->getMessage()]);
+                    $pendaftaran->update([
+                        'status_wa_bayar' => 'belum_terkirim',
+                    ]);
+                    $waStatusMsg = ' (Status WA: Belum Terkirim)';
+                }
+            } else {
+                $pendaftaran->update(['status_wa_bayar' => 'belum_terkirim']);
+                $waStatusMsg = ' (Nomor WA tidak tersedia)';
+            }
+        } elseif ($request->action === 'approve') {
+            $pendaftaran->update(['status_wa_bayar' => 'belum_terkirim']);
+        }
+
+        // ── PENGIRIMAN NOTIFIKASI EMAIL KONFIRMASI PEMBAYARAN ────────────────
+        if ($request->action === 'approve') {
+            $recipientEmail = $pendaftaran->user?->email;
+            if (!empty($recipientEmail)) {
+                try {
+                    Mail::to($recipientEmail)->send(new KonfirmasiPembayaranMail(
+                        $pendaftaran,
+                        $nominalBaru,
+                        $statusBaru,
+                        $jenisPembayaran
+                    ));
+                    $pendaftaran->update([
+                        'status_email_bayar'  => 'terkirim',
+                        'email_bayar_sent_at' => now(),
+                    ]);
+                    Log::info("[Email Pembayaran] Sukses terkirim ke: {$recipientEmail}");
+                } catch (\Throwable $e) {
+                    $pendaftaran->update([
+                        'status_email_bayar' => 'belum_terkirim',
+                    ]);
+                    Log::error("[Email Pembayaran] Gagal kirim ke {$recipientEmail}: " . $e->getMessage());
+                }
+            } else {
+                $pendaftaran->update(['status_email_bayar' => 'belum_terkirim']);
+            }
         }
 
         return redirect()->route('pembayaran-admin.index')
-            ->with('status', 'Status pembayaran pendaftar berhasil diperbarui! Notifikasi WhatsApp dikirim ke antrian.');
+            ->with('status', 'Status pembayaran pendaftar berhasil diperbarui!' . $waStatusMsg);
 
     })->name('pembayaran-admin.confirm');
+
+    /**
+     * Admin: Edit / Koreksi Data Pembayaran Siswa
+     *
+     * Memungkinkan admin untuk mengedit kembali status pembayaran, nominal terbayar,
+     * catatan pembayaran, serta mengirimkan notifikasi WA pembaruan jika diperlukan.
+     */
+    Route::put('/pembayaran-admin/{pendaftaran}/update', function (Request $request, Pendaftaran $pendaftaran) {
+        $user = Auth::user();
+
+        if ($user->role !== 'admin') {
+            abort(403);
+        }
+
+        $request->validate([
+            'payment_status'     => 'required|in:belum_bayar,menunggu_konfirmasi,cicilan,lunas',
+            'amount_paid'        => 'required|numeric|min:0',
+            'catatan_pembayaran' => 'nullable|string|max:1000',
+            'jenis_pembayaran'   => 'nullable|string|max:100',
+            'kirim_notif_wa'     => 'nullable|boolean',
+        ]);
+
+        $nominalBaru     = (float) $request->amount_paid;
+        $statusBaru      = $request->payment_status;
+        $jenisPembayaran = $request->jenis_pembayaran ?: 'Koreksi Data Pembayaran';
+
+        try {
+            DB::transaction(function () use ($request, $pendaftaran, $nominalBaru, $statusBaru) {
+                $pendaftaran->payment_status     = $statusBaru;
+                $pendaftaran->amount_paid        = $nominalBaru;
+                $pendaftaran->catatan_pembayaran = $request->catatan_pembayaran;
+                $pendaftaran->save();
+            });
+        } catch (\Throwable $e) {
+            Log::error('[Pembayaran Edit] DB transaction gagal.', [
+                'pendaftaran_id' => $pendaftaran->id,
+                'error'          => $e->getMessage(),
+            ]);
+
+            return redirect()->route('pembayaran-admin.index')
+                ->with('error', 'Gagal memperbarui data pembayaran. Silakan coba lagi.');
+        }
+
+        // Kirim notifikasi WA jika opsi kirim_notif_wa dipilih
+        if ($request->boolean('kirim_notif_wa', false)) {
+            $pendaftaran->refresh();
+            if (!empty($pendaftaran->no_hp_wali)) {
+                try {
+                    $waService = app(\App\Services\WhatsAppService::class);
+                    $nominalFmt  = 'Rp ' . number_format($nominalBaru, 0, ',', '.');
+                    $statusLabel = $statusBaru === 'lunas' ? 'LUNAS' : ($statusBaru === 'cicilan' ? 'CICILAN' : strtoupper($statusBaru));
+                    $pesan = "Assalamu'alaikum Wr. Wb.\n\nPembaruan data pembayaran *{$pendaftaran->nama_lengkap}*:\n🏷️ Jenis: {$jenisPembayaran}\n💰 Nominal: {$nominalFmt}\nStatus: *{$statusLabel}*\n\n-- Admin MI Nurussalam";
+                    $waResult = $waService->send($pendaftaran->no_hp_wali, $pesan);
+                    if (!empty($waResult['success']) && $waResult['success'] === true) {
+                        $pendaftaran->update([
+                            'status_wa_bayar'  => 'terkirim',
+                            'wa_bayar_sent_at' => now(),
+                        ]);
+                    } else {
+                        $pendaftaran->update([
+                            'status_wa_bayar' => 'belum_terkirim',
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    $pendaftaran->update([
+                        'status_wa_bayar' => 'belum_terkirim',
+                    ]);
+                }
+            }
+
+            // Kirim notifikasi Email pembaruan
+            $recipientEmail = $pendaftaran->user?->email;
+            if (!empty($recipientEmail)) {
+                try {
+                    Mail::to($recipientEmail)->send(new KonfirmasiPembayaranMail(
+                        $pendaftaran,
+                        $nominalBaru,
+                        $statusBaru,
+                        $jenisPembayaran
+                    ));
+                    $pendaftaran->update([
+                        'status_email_bayar'  => 'terkirim',
+                        'email_bayar_sent_at' => now(),
+                    ]);
+                } catch (\Throwable $e) {
+                    $pendaftaran->update([
+                        'status_email_bayar' => 'belum_terkirim',
+                    ]);
+                }
+            }
+        }
+
+        return redirect()->route('pembayaran-admin.index')
+            ->with('status', "Data pembayaran calon siswa ({$pendaftaran->nama_lengkap}) berhasil diperbarui!");
+    })->name('pembayaran-admin.update');
 
     // ─── Admin: Data Pendaftar ────────────────────────────────────────────────
     Route::get('/data-pendaftar', function (Request $request) {
@@ -505,7 +663,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         }
 
         if ($search) {
-            $query->where('nama_lengkap', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->where('nama_lengkap', 'like', "%{$search}%")
+                  ->orWhere('nik', 'like', "%{$search}%");
+            });
         }
 
         if ($status) {
@@ -527,8 +688,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ],
             'periodes'         => $periodes,           // [BARU]
             'selectedPeriodeId'=> $periodeId ? (int) $periodeId : null, // [BARU]
+            'flash_status'     => session('status'),
+            'flash_error'      => session('error'),
         ]);
     })->name('data-pendaftar.index');
+
+    Route::post('/data-pendaftar/{pendaftaran}/update', [PendaftaranController::class, 'updateAdmin'])->name('data-pendaftar.update');
+    Route::post('/data-pendaftar/{pendaftaran}/kirim-notifikasi', [PendaftaranController::class, 'kirimPemberitahuanBiodata'])->name('data-pendaftar.kirim-notifikasi');
 
     // ─── Admin: Verifikasi Kelengkapan Berkas ─────────────────────────────────
     Route::get('/verifikasi-berkas', function (Request $request) {
@@ -556,7 +722,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         }
 
         if ($search) {
-            $query->where('nama_lengkap', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->where('nama_lengkap', 'like', "%{$search}%")
+                  ->orWhere('nik', 'like', "%{$search}%");
+            });
         }
 
         $pendaftarans = $query->orderBy('created_at', 'desc')->get();
@@ -594,8 +763,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ],
             'periodes'         => $periodes,           // [BARU]
             'selectedPeriodeId'=> $periodeId ? (int) $periodeId : null, // [BARU]
+            'flash_status'     => session('status'),
+            'flash_error'      => session('error'),
         ]);
     })->name('verifikasi-berkas.index');
+
+    Route::post('/verifikasi-berkas/{pendaftaran}/hapus-dokumen', [DokumenController::class, 'hapusDokumenAdmin'])->name('verifikasi-berkas.hapus-dokumen');
+    Route::post('/verifikasi-berkas/{pendaftaran}/kirim-pemberitahuan', [DokumenController::class, 'kirimPemberitahuan'])->name('verifikasi-berkas.kirim-pemberitahuan');
 
     // ─── Admin: Manajemen Pengumuman ──────────────────────────────────────────
     Route::get('/pengumuman-admin', function (Request $request) {
@@ -633,6 +807,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'stats'            => $stats,
             'periodes'         => $periodes,           // [BARU]
             'selectedPeriodeId'=> $periodeId ? (int) $periodeId : null, // [BARU]
+            'flash_status'     => session('status'),
+            'flash_error'      => session('error'),
         ]);
     })->name('pengumuman-admin.index');
 

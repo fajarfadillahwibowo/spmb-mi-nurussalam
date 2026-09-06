@@ -45,10 +45,18 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'nama_orang_tua',
     'no_hp_wali',
     'status',
+    'status_wa_lulus',
+    'wa_lulus_sent_at',
+    'status_email_lulus',
+    'email_lulus_sent_at',
     'payment_status',
     'amount_paid',
     'bukti_pembayaran_path',
     'catatan_pembayaran',
+    'status_wa_bayar',
+    'wa_bayar_sent_at',
+    'status_email_bayar',
+    'email_bayar_sent_at',
     'pas_foto_path',
 ])]
 class Pendaftaran extends Model
@@ -61,7 +69,11 @@ class Pendaftaran extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'tanggal_lahir' => 'date',
+        'tanggal_lahir'       => 'date',
+        'wa_lulus_sent_at'    => 'datetime',
+        'wa_bayar_sent_at'    => 'datetime',
+        'email_lulus_sent_at' => 'datetime',
+        'email_bayar_sent_at' => 'datetime',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────

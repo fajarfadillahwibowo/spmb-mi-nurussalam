@@ -42,8 +42,16 @@ class RegisteredUserController extends Controller
 
         $request->validate([
             'username' => ['required', 'string', 'min:3', 'max:255', 'regex:/^[\pL\pN\s\-\_]+$/u', 'unique:'.User::class],
-            'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'email'    => 'required|string|lowercase|email|max:255|unique:'.User::class,
+            'password' => ['required', 'string', 'min:8', 'confirmed', Rules\Password::defaults()],
+        ], [
+            'password.min'       => 'Password minimal harus terdiri dari 8 karakter.',
+            'password.confirmed' => 'Konfirmasi password tidak sesuai.',
+            'password.required'  => 'Kolom password wajib diisi.',
+            'username.required'  => 'Kolom username wajib diisi.',
+            'email.required'     => 'Alamat email aktif wajib diisi.',
+            'email.unique'       => 'Alamat email ini sudah terdaftar.',
+            'username.unique'    => 'Username ini sudah digunakan.',
         ]);
 
         $code = sprintf('%06d', rand(0, 999999));

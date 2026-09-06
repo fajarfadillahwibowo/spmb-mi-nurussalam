@@ -61,25 +61,42 @@ class PeriodeSpmb extends Model
     }
 
     /**
-     * Kembalikan tanggal awal periode ini (gel1_mulai atau 1 Jan tahun bersangkutan).
+     * Kembalikan tanggal awal periode ini.
+     * Menggunakan awal tahun bersangkutan (atau lebih awal jika gelombang 1 dimulai sebelum awal tahun).
      * Digunakan sebagai batas bawah filter data.
      */
     public function getStartDate(): Carbon
     {
-        return $this->gel1_mulai
-            ? Carbon::parse($this->gel1_mulai)->startOfDay()
-            : Carbon::create($this->tahun, 1, 1)->startOfDay();
+        $startOfYear = Carbon::create($this->tahun, 1, 1)->startOfDay();
+
+        if ($this->gel1_mulai) {
+            $gel1 = Carbon::parse($this->gel1_mulai)->startOfDay();
+            return $gel1->lt($startOfYear) ? $gel1 : $startOfYear;
+        }
+
+        return $startOfYear;
     }
 
     /**
-     * Kembalikan tanggal akhir periode ini (gel3_selesai atau 31 Des tahun bersangkutan).
+     * Kembalikan tanggal akhir periode ini.
+     * Menggunakan akhir tahun bersangkutan (atau tanggal gelombang 3 jika melewati akhir tahun).
+     * Jika ini adalah periode aktif, selalu mencakup tanggal hari ini agar pendaftar baru tidak terpotong.
      * Digunakan sebagai batas atas filter data.
      */
     public function getEndDate(): Carbon
     {
-        return $this->gel3_selesai
-            ? Carbon::parse($this->gel3_selesai)->endOfDay()
-            : Carbon::create($this->tahun, 12, 31)->endOfDay();
+        $endOfYear = Carbon::create($this->tahun, 12, 31)->endOfDay();
+
+        if ($this->gel3_selesai) {
+            $gel3 = Carbon::parse($this->gel3_selesai)->endOfDay();
+            $endOfYear = $gel3->gt($endOfYear) ? $gel3 : $endOfYear;
+        }
+
+        if ($this->is_aktif && now()->gt($endOfYear)) {
+            return now()->endOfDay();
+        }
+
+        return $endOfYear;
     }
 
     /** Daftar semua tahun yang tersedia sebagai array. */

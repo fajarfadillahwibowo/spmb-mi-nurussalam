@@ -6,11 +6,14 @@ namespace App\Http\Controllers;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
 
 // ─── Internal Imports ─────────────────────────────────────────────────────────
 use App\Jobs\SendWhatsAppNotification;
+use App\Mail\PengumumanKelulusanMail;
 use App\Models\Pendaftaran;
 use App\Models\Seleksi;
 
@@ -49,7 +52,10 @@ class SeleksiController extends Controller
         $query = Pendaftaran::with(['user', 'dokumen']);
 
         if ($search) {
-            $query->where('nama_lengkap', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->where('nama_lengkap', 'like', "%{$search}%")
+                  ->orWhere('nik', 'like', "%{$search}%");
+            });
         }
 
         if ($status) {
@@ -112,8 +118,18 @@ class SeleksiController extends Controller
             abort(403, 'Aksi ditolak.');
         }
 
+        // Mendukung input status_seleksi atau status dari frontend
+        $statusInput = $request->input('status_seleksi') ?? $request->input('status');
+
+        // Normalisasi jika dikirim sebagai 'menunggu' atau 'menunggu_verifikasi'
+        if ($statusInput === 'menunggu' || $statusInput === 'menunggu_verifikasi') {
+            $statusInput = 'proses';
+        }
+
+        $request->merge(['status_seleksi' => $statusInput]);
+
         $request->validate([
-            'status_seleksi' => 'required|in:lulus,tidak_lulus',
+            'status_seleksi' => 'required|in:lulus,tidak_lulus,proses',
             'catatan'        => 'nullable|string',
         ]);
 
@@ -129,23 +145,73 @@ class SeleksiController extends Controller
         $statusSebelumnya = $seleksi->status_seleksi;
 
         $seleksi->admin_id       = Auth::id();
-        $seleksi->status_seleksi = $request->status_seleksi;
+        $seleksi->status_seleksi = $statusInput;
         $seleksi->catatan        = $request->catatan;
         $seleksi->save();
 
         // Sinkronkan status utama pada tabel pendaftaran agar konsisten.
-        $pendaftaran->status = $request->status_seleksi;
-        $pendaftaran->save();
+        $pendaftaran->status = ($statusInput === 'proses') ? 'menunggu_verifikasi' : $statusInput;
 
-        // Dispatch Job notifikasi WA hanya jika status BERUBAH.
-        // Ini mencegah notifikasi terkirim ganda jika admin menyimpan ulang
-        // tanpa mengubah status evaluasi.
-        if ($statusSebelumnya !== $request->status_seleksi) {
-            SendWhatsAppNotification::dispatch($pendaftaran, $request->status_seleksi)
-                ->delay(now()->addSeconds(3));
+        // ─── LOGIKA PELACAKAN STATUS NOTIFIKASI WA KELULUSAN ─────────────────
+        if ($statusInput === 'lulus' && $statusSebelumnya !== 'lulus') {
+            if (!empty($pendaftaran->no_hp_wali)) {
+                try {
+                    $waService = app(\App\Services\WhatsAppService::class);
+                    $pesan = \App\Services\WhatsAppService::buildLulusMessage($pendaftaran->nama_lengkap);
+                    $result = $waService->send($pendaftaran->no_hp_wali, $pesan);
+
+                    if (!empty($result['success']) && $result['success'] === true) {
+                        $pendaftaran->status_wa_lulus  = 'terkirim';
+                        $pendaftaran->wa_lulus_sent_at = now();
+                    } else {
+                        $pendaftaran->status_wa_lulus = 'belum_terkirim';
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('[SeleksiController] Gagal kirim WA kelulusan', [
+                        'error' => $e->getMessage(),
+                    ]);
+                    $pendaftaran->status_wa_lulus = 'belum_terkirim';
+                }
+            } else {
+                $pendaftaran->status_wa_lulus = 'belum_terkirim';
+            }
+
+            // ─── LOGIKA PENGIRIMAN & PELACAKAN STATUS EMAIL KELULUSAN ─────────
+            $recipientEmail = $pendaftaran->user?->email;
+            if (!empty($recipientEmail)) {
+                try {
+                    Mail::to($recipientEmail)->send(new PengumumanKelulusanMail($pendaftaran));
+                    $pendaftaran->status_email_lulus  = 'terkirim';
+                    $pendaftaran->email_lulus_sent_at = now();
+                    Log::info("[Email Kelulusan] Sukses terkirim ke: {$recipientEmail}");
+                } catch (\Throwable $e) {
+                    $pendaftaran->status_email_lulus = 'belum_terkirim';
+                    Log::error("[Email Kelulusan] Gagal kirim ke {$recipientEmail}: " . $e->getMessage());
+                }
+            } else {
+                $pendaftaran->status_email_lulus = 'belum_terkirim';
+            }
+
+        } elseif ($statusInput === 'tidak_lulus' && $statusSebelumnya !== 'tidak_lulus') {
+            // Notifikasi tidak lulus tetap dikirim via Job/Queue
+            SendWhatsAppNotification::dispatch($pendaftaran, 'tidak_lulus');
+        } elseif ($statusInput === 'proses') {
+            // Reset status WA & Email jika admin me-reset keputusan
+            $pendaftaran->status_wa_lulus     = 'belum_terkirim';
+            $pendaftaran->wa_lulus_sent_at    = null;
+            $pendaftaran->status_email_lulus  = 'belum_terkirim';
+            $pendaftaran->email_lulus_sent_at = null;
         }
 
-        return redirect()->route('seleksi.index')
-            ->with('status', 'Evaluasi berhasil disimpan! Notifikasi WhatsApp sedang dikirim ke wali siswa.');
+        $pendaftaran->save();
+
+        $waFeedback = '';
+        if ($statusInput === 'lulus') {
+            $waFeedback = ' (' . ($pendaftaran->status_wa_lulus === 'terkirim' ? 'WA: Terkirim' : 'WA: Belum Terkirim')
+                        . ' | ' . ($pendaftaran->status_email_lulus === 'terkirim' ? 'Email: Terkirim' : 'Email: Belum Terkirim') . ')';
+        }
+
+        return redirect()->back(302, [], route('seleksi.index'))
+            ->with('status', 'Status pengumuman/kelulusan calon siswa berhasil diperbarui!' . $waFeedback);
     }
 }

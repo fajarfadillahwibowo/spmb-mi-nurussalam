@@ -12,6 +12,8 @@ use Inertia\Response;
 
 // ─── Internal Imports ─────────────────────────────────────────────────────────
 use App\Models\Pendaftaran;
+use App\Helpers\NotifikasiHelper;
+use App\Services\WhatsAppService;
 
 /**
  * Controller Pendaftaran (Manajemen Biodata Calon Peserta Didik)
@@ -117,5 +119,108 @@ class PendaftaranController extends Controller
         $pendaftaran->save();
 
         return redirect()->route('pendaftaran.index')->with('status', 'Biodata berhasil disimpan!');
+    }
+
+    /**
+     * Memperbarui/mengoreksi data calon siswa oleh admin.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Pendaftaran   $pendaftaran
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function updateAdmin(Request $request, Pendaftaran $pendaftaran): RedirectResponse
+    {
+        if (Auth::user()->role !== 'admin') {
+            abort(403, 'Aksi ditolak.');
+        }
+
+        $request->validate([
+            'nik'           => 'required|string|size:16|regex:/^[0-9]+$/',
+            'asal_sekolah'  => 'nullable|string|max:255',
+            'nama_lengkap'  => 'required|string|max:255',
+            'tempat_lahir'  => 'required|string|max:255',
+            'tanggal_lahir' => 'required|date',
+            'jenis_kelamin' => 'required|in:L,P',
+            'alamat'        => 'required|string',
+            'nama_orang_tua'=> 'required|string|max:255',
+            'no_hp_wali'    => 'required|string|max:20',
+        ]);
+
+        $pendaftaran->nik            = $request->nik;
+        $pendaftaran->asal_sekolah   = $request->asal_sekolah;
+        $pendaftaran->nama_lengkap   = $request->nama_lengkap;
+        $pendaftaran->tempat_lahir   = $request->tempat_lahir;
+        $pendaftaran->tanggal_lahir  = $request->tanggal_lahir;
+        $pendaftaran->jenis_kelamin  = $request->jenis_kelamin;
+        $pendaftaran->alamat         = $request->alamat;
+        $pendaftaran->nama_orang_tua = $request->nama_orang_tua;
+        $pendaftaran->no_hp_wali     = $request->no_hp_wali;
+        $pendaftaran->save();
+
+        // Kirim notifikasi in-app ke akun siswa
+        if ($pendaftaran->user_id) {
+            NotifikasiHelper::kirimKePengguna(
+                userId:  $pendaftaran->user_id,
+                title:   '✏️ Biodata Diperbarui oleh Admin',
+                message: 'Data formulir biodata pendaftaran Anda telah disesuaikan/diperbaiki oleh admin panitia SPMB.',
+                linkUrl: '/pendaftaran'
+            );
+        }
+
+        return redirect()->back(302, [], route('data-pendaftar.index'))
+            ->with('status', "Biodata calon siswa {$pendaftaran->nama_lengkap} berhasil diperbarui.");
+    }
+
+    /**
+     * Mengirim notifikasi instruksi perbaikan biodata ke calon siswa.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Pendaftaran   $pendaftaran
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function kirimPemberitahuanBiodata(Request $request, Pendaftaran $pendaftaran): RedirectResponse
+    {
+        if (Auth::user()->role !== 'admin') {
+            abort(403, 'Aksi ditolak.');
+        }
+
+        $request->validate([
+            'pesan'    => 'required|string|max:1000',
+            'kirim_wa' => 'nullable|boolean',
+        ]);
+
+        // 1. Kirim notifikasi in-app ke calon siswa (muncul di lonceng notifikasi pojok kanan atas)
+        if ($pendaftaran->user_id) {
+            NotifikasiHelper::kirimKePengguna(
+                userId:  $pendaftaran->user_id,
+                title:   '⚠️ Pembaruan Biodata Diperlukan',
+                message: $request->pesan,
+                linkUrl: '/pendaftaran'
+            );
+        }
+
+        // 2. Kirim notifikasi via WhatsApp jika dipilih dan nomor wali tersedia
+        $waSent = false;
+        if ($request->boolean('kirim_wa') && !empty($pendaftaran->no_hp_wali)) {
+            try {
+                $waService = app(WhatsAppService::class);
+                $waMessage = WhatsAppService::buildPerbaikanBiodataMessage(
+                    $pendaftaran->nama_lengkap,
+                    $request->pesan
+                );
+                $waResult = $waService->send($pendaftaran->no_hp_wali, $waMessage);
+                $waSent = $waResult['success'] ?? false;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[DataPendaftar] Gagal kirim WA notifikasi biodata', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $feedbackMsg = 'Pemberitahuan perbaikan biodata berhasil dikirim ke calon siswa (tersedia di lonceng notifikasi)'
+            . ($waSent ? ' dan pesan WhatsApp terkirim ke wali.' : '.');
+
+        return redirect()->back(302, [], route('data-pendaftar.index'))
+            ->with('status', $feedbackMsg);
     }
 }

@@ -5,6 +5,8 @@ import Swal from 'sweetalert2';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import PeriodeFilterBar from '@/Components/PeriodeFilterBar'; // [BARU]
+import WaStatusBadge from '@/Components/WaStatusBadge';
+import EmailStatusBadge from '@/Components/EmailStatusBadge';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -16,12 +18,80 @@ export default function AdminPembayaran({ pendaftarans, filters, flash_status, f
     const [newStatus, setNewStatus] = useState('lunas');
     const [catatan, setCatatan] = useState('');
     const [verifiedAmount, setVerifiedAmount] = useState('');
-    const [jenisPembayaran, setJenisPembayaran] = useState('Uang Pangkal');
+    const [jenisPembayaran, setJenisPembayaran] = useState('Total Biaya Masuk (Semua Komponen)');
     const [kirimNotifWa, setKirimNotifWa] = useState(true);
     // loadingId: menyimpan ID pendaftaran yang sedang diproses.
     // Ini mencegah admin mengklik tombol lain selagi 1 request berjalan.
     const [loadingId, setLoadingId] = useState(null);
     const isSubmitting = loadingId !== null;
+
+    // State Edit Data Pembayaran
+    const [editingPendaftaran, setEditingPendaftaran] = useState(null);
+    const [editPaymentStatus, setEditPaymentStatus] = useState('belum_bayar');
+    const [editAmountPaid, setEditAmountPaid] = useState('');
+    const [editCatatan, setEditCatatan] = useState('');
+    const [editJenisPembayaran, setEditJenisPembayaran] = useState('Total Biaya Masuk (Semua Komponen)');
+    const [editKirimNotifWa, setEditKirimNotifWa] = useState(false);
+    const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+
+    const openEditModal = (p) => {
+        setEditingPendaftaran(p);
+        setEditPaymentStatus(p.payment_status || 'belum_bayar');
+        setEditAmountPaid(p.amount_paid ?? 0);
+        setEditCatatan(p.catatan_pembayaran || '');
+        setEditJenisPembayaran('Total Biaya Masuk (Semua Komponen)');
+        setEditKirimNotifWa(false);
+    };
+
+    const closeEditModal = () => {
+        setEditingPendaftaran(null);
+        setEditAmountPaid('');
+        setEditCatatan('');
+        setIsSubmittingEdit(false);
+    };
+
+    const handleEditSubmit = (e) => {
+        e.preventDefault();
+        if (!editingPendaftaran || isSubmittingEdit) return;
+
+        setIsSubmittingEdit(true);
+
+        router.put(
+            route('pembayaran-admin.update', editingPendaftaran.id),
+            {
+                payment_status: editPaymentStatus,
+                amount_paid: parseFloat(editAmountPaid) || 0,
+                catatan_pembayaran: editCatatan,
+                jenis_pembayaran: editJenisPembayaran,
+                kirim_notif_wa: editKirimNotifWa ? 1 : 0,
+            },
+            {
+                onSuccess: () => {
+                    closeEditModal();
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Berhasil!',
+                        text: 'Data pembayaran berhasil diperbarui.',
+                        timer: 3000,
+                        showConfirmButton: false,
+                        toast: true,
+                        position: 'top-end',
+                    });
+                },
+                onError: (errors) => {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal!',
+                        text: Object.values(errors)[0] || 'Terjadi kesalahan saat menyimpan data.',
+                        confirmButtonColor: '#16a34a',
+                    });
+                },
+                onFinish: () => {
+                    setIsSubmittingEdit(false);
+                },
+            }
+        );
+    };
 
     const handleFilter = () => {
         router.get(route('pembayaran-admin.index'), {
@@ -97,7 +167,7 @@ export default function AdminPembayaran({ pendaftarans, filters, flash_status, f
                     setActivePendaftaran(null);
                     setCatatan('');
                     setVerifiedAmount('');
-                    setJenisPembayaran('Uang Pangkal');
+                    setJenisPembayaran('Total Biaya Masuk (Semua Komponen)');
                     setKirimNotifWa(true);
 
                     // Konfirmasi sukses
@@ -270,36 +340,74 @@ export default function AdminPembayaran({ pendaftarans, filters, flash_status, f
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
-                                                    {p.bukti_pembayaran_path ? (
-                                                        <button
-                                                            id={`btn-tinjau-${p.id}`}
-                                                            onClick={() => {
-                                                                if (isSubmitting) return; // Guard: blokir klik jika ada proses berjalan
-                                                                setActivePendaftaran(p);
-                                                                setAction('approve');
-                                                                setNewStatus(p.payment_status === 'cicilan' ? 'cicilan' : 'lunas');
-                                                                setVerifiedAmount(p.amount_paid);
-                                                            }}
-                                                            disabled={isSubmitting}
-                                                            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all shadow-sm ${
-                                                                isSubmitting
-                                                                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500'
-                                                                    : 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500'
-                                                            }`}
-                                                        >
-                                                            {loadingId === p.id ? (
-                                                                <span className="flex items-center gap-1.5">
-                                                                    <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
-                                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                                                                    </svg>
-                                                                    Memproses...
-                                                                </span>
-                                                            ) : 'Tinjau Bukti'}
-                                                        </button>
-                                                    ) : (
-                                                        <span className="text-slate-450 text-xs font-bold italic">Belum Upload</span>
-                                                    )}
+                                                    <div className="flex flex-col items-center gap-1.5">
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            {p.bukti_pembayaran_path ? (
+                                                                <button
+                                                                    id={`btn-tinjau-${p.id}`}
+                                                                    onClick={() => {
+                                                                        if (isSubmitting) return; // Guard: blokir klik jika ada proses berjalan
+                                                                        setActivePendaftaran(p);
+                                                                        setAction('approve');
+                                                                        setNewStatus(p.payment_status === 'cicilan' ? 'cicilan' : 'lunas');
+                                                                        setVerifiedAmount(p.amount_paid);
+                                                                    }}
+                                                                    disabled={isSubmitting}
+                                                                    className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all shadow-sm ${
+                                                                        isSubmitting
+                                                                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500'
+                                                                            : 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500'
+                                                                    }`}
+                                                                    title="Tinjau bukti transfer pendaftar"
+                                                                >
+                                                                    {loadingId === p.id ? (
+                                                                        <span className="flex items-center gap-1.5">
+                                                                            <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                                                            </svg>
+                                                                            Memproses...
+                                                                        </span>
+                                                                    ) : (
+                                                                        <>
+                                                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-3.5 w-3.5">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                                                            </svg>
+                                                                            Tinjau
+                                                                        </>
+                                                                    )}
+                                                                </button>
+                                                            ) : null}
+
+                                                            <button
+                                                                id={`btn-edit-${p.id}`}
+                                                                onClick={() => openEditModal(p)}
+                                                                disabled={isSubmitting || isSubmittingEdit}
+                                                                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 px-3 py-1.5 text-xs font-bold transition-all shadow-sm"
+                                                                title="Edit / Koreksi Data Pembayaran"
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                                                </svg>
+                                                                Edit
+                                                            </button>
+                                                        </div>
+
+                                                        {/* Indikator Status WA & Email Pembayaran */}
+                                                        {(p.payment_status === 'lunas' || p.payment_status === 'cicilan' || p.status_wa_bayar === 'terkirim' || p.status_email_bayar === 'terkirim') && (
+                                                            <div className="flex flex-col items-center gap-1 mt-0.5">
+                                                                <WaStatusBadge
+                                                                    status={p.status_wa_bayar || 'belum_terkirim'}
+                                                                    sentAt={p.wa_bayar_sent_at}
+                                                                />
+                                                                <EmailStatusBadge
+                                                                    status={p.status_email_bayar || 'belum_terkirim'}
+                                                                    sentAt={p.email_bayar_sent_at}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))
@@ -307,6 +415,32 @@ export default function AdminPembayaran({ pendaftarans, filters, flash_status, f
                                 </tbody>
                             </table>
                         </div>
+
+                        {/* Pagination Links */}
+                        {links.length > 3 && (
+                            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 p-4 dark:border-slate-800">
+                                <span className="text-xs font-semibold text-slate-500">
+                                    Total {totalPendaftar} data pembayaran
+                                </span>
+                                <div className="flex flex-wrap gap-1">
+                                    {links.map((link, i) => (
+                                        <button
+                                            key={i}
+                                            disabled={!link.url || link.active}
+                                            onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
+                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
+                                                link.active
+                                                    ? 'bg-emerald-600 text-white shadow-sm'
+                                                    : link.url
+                                                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                                                    : 'cursor-not-allowed text-slate-400 opacity-50'
+                                            }`}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -369,6 +503,20 @@ export default function AdminPembayaran({ pendaftarans, filters, flash_status, f
                             <div className="flex justify-between">
                                 <span className="text-slate-450 uppercase text-[9px]">Status Saat Ini</span>
                                 <span className="text-amber-600 uppercase tracking-wider">{getStatusLabel(activePendaftaran.payment_status)}</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-2 border-t border-slate-200/50 dark:border-slate-800">
+                                <span className="text-slate-450 uppercase text-[9px]">Status WA</span>
+                                <WaStatusBadge
+                                    status={activePendaftaran.status_wa_bayar || 'belum_terkirim'}
+                                    sentAt={activePendaftaran.wa_bayar_sent_at}
+                                />
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-slate-450 uppercase text-[9px]">Status Email</span>
+                                <EmailStatusBadge
+                                    status={activePendaftaran.status_email_bayar || 'belum_terkirim'}
+                                    sentAt={activePendaftaran.email_bayar_sent_at}
+                                />
                             </div>
                         </div>
 
@@ -441,11 +589,19 @@ export default function AdminPembayaran({ pendaftarans, filters, flash_status, f
                                             onChange={(e) => setJenisPembayaran(e.target.value)}
                                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 font-bold"
                                         >
-                                            <option value="Uang Pangkal">Uang Pangkal</option>
-                                            <option value="Biaya Seragam">Biaya Seragam</option>
-                                            <option value="Biaya Buku & Alat Tulis">Biaya Buku & Alat Tulis</option>
-                                            <option value="Biaya Pendaftaran SPMB">Biaya Pendaftaran SPMB</option>
-                                            <option value="Biaya Kegiatan">Biaya Kegiatan</option>
+                                            <optgroup label="Paket Pembayaran">
+                                                <option value="Total Biaya Masuk (Semua Komponen)">Total Biaya Masuk (Semua Komponen)</option>
+                                                <option value="Cicilan Biaya Masuk">Cicilan Biaya Masuk</option>
+                                            </optgroup>
+                                            <optgroup label="Rincian Komponen Biaya (7 Komponen)">
+                                                <option value="1. Biaya Pendaftaran">1. Biaya Pendaftaran (Gratis)</option>
+                                                <option value="2. Uang Kaos Olahraga">2. Uang Kaos Olahraga (Rp 160.000)</option>
+                                                <option value="3. Uang Buku Rapor">3. Uang Buku Rapor (Rp 100.000)</option>
+                                                <option value="4. Uang Buku Paket / LKS">4. Uang Buku Paket / LKS (Rp 100.000)</option>
+                                                <option value="5. Uang Foto">5. Uang Foto (Rp 20.000)</option>
+                                                <option value="6. Uang Kegiatan Eskul">6. Uang Kegiatan Eskul (Rp 50.000)</option>
+                                                <option value="7. Uang Wakaf Pengembangan Madrasah">7. Uang Wakaf Pengembangan Madrasah (ZISWAF)</option>
+                                            </optgroup>
                                         </select>
                                     </div>
 
@@ -531,6 +687,199 @@ export default function AdminPembayaran({ pendaftarans, filters, flash_status, f
                 )}
             </div>
             </div>
+
+            {/* Modal Edit / Koreksi Pembayaran */}
+            {editingPendaftaran && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+                    <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 md:p-8 dark:border-slate-800 dark:bg-slate-950 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-5 w-5">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Edit Data Pembayaran</h3>
+                                    <p className="text-xs text-slate-500 font-medium">{editingPendaftaran.nama_lengkap} (NIK: {editingPendaftaran.nik || '-'})</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={closeEditModal}
+                                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-900 transition-colors"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Form */}
+                        <form onSubmit={handleEditSubmit} className="space-y-4">
+                            {/* Status WA & Email Terakhir */}
+                            <div className="flex flex-col gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-500">Status Notifikasi WA:</span>
+                                    <WaStatusBadge
+                                        status={editingPendaftaran.status_wa_bayar || 'belum_terkirim'}
+                                        sentAt={editingPendaftaran.wa_bayar_sent_at}
+                                    />
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-500">Status Notifikasi Email:</span>
+                                    <EmailStatusBadge
+                                        status={editingPendaftaran.status_email_bayar || 'belum_terkirim'}
+                                        sentAt={editingPendaftaran.email_bayar_sent_at}
+                                    />
+                                </div>
+                            </div>
+                            {/* Status Pembayaran Selector */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block">Status Pembayaran</label>
+                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                    {[
+                                        { val: 'belum_bayar', label: 'Belum Bayar' },
+                                        { val: 'menunggu_konfirmasi', label: 'Menunggu' },
+                                        { val: 'cicilan', label: 'Cicilan' },
+                                        { val: 'lunas', label: 'Lunas' },
+                                    ].map((opt) => (
+                                        <button
+                                            key={opt.val}
+                                            type="button"
+                                            onClick={() => setEditPaymentStatus(opt.val)}
+                                            className={`rounded-xl p-2 text-center text-xs font-bold transition-all border ${
+                                                editPaymentStatus === opt.val
+                                                    ? 'border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 ring-2 ring-emerald-500/20'
+                                                    : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-400'
+                                            }`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Total Terbayar (Nominal) */}
+                            <div className="space-y-1.5">
+                                <label htmlFor="edit_amount_paid" className="text-xs font-bold text-slate-500 uppercase tracking-widest block">
+                                    Total Nominal Terbayar (Rp)
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                                    <input
+                                        id="edit_amount_paid"
+                                        type="number"
+                                        min="0"
+                                        step="1000"
+                                        value={editAmountPaid}
+                                        onChange={(e) => setEditAmountPaid(e.target.value)}
+                                        placeholder="0"
+                                        className="w-full pl-10 pr-4 py-2.5 text-sm font-bold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:ring-emerald-500 focus:outline-none"
+                                        required
+                                    />
+                                </div>
+                                <span className="text-[11px] font-semibold text-slate-500 block">
+                                    Format: <strong className="text-emerald-600 dark:text-emerald-400">{formatRupiah(parseFloat(editAmountPaid) || 0)}</strong>
+                                </span>
+                            </div>
+
+                            {/* Jenis Pembayaran */}
+                            <div className="space-y-1.5">
+                                <label htmlFor="edit_jenis_pembayaran" className="text-xs font-bold text-slate-500 uppercase tracking-widest block">
+                                    Jenis / Komponen Pembayaran
+                                </label>
+                                <select
+                                    id="edit_jenis_pembayaran"
+                                    value={editJenisPembayaran}
+                                    onChange={(e) => setEditJenisPembayaran(e.target.value)}
+                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-xs font-bold focus:border-emerald-500 focus:ring-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                >
+                                    <optgroup label="Paket Pembayaran">
+                                        <option value="Total Biaya Masuk (Semua Komponen)">Total Biaya Masuk (Semua Komponen)</option>
+                                        <option value="Cicilan Biaya Masuk">Cicilan Biaya Masuk</option>
+                                        <option value="Koreksi Data Pembayaran">Koreksi Data Pembayaran</option>
+                                    </optgroup>
+                                    <optgroup label="Rincian Komponen Biaya (7 Komponen)">
+                                        <option value="1. Biaya Pendaftaran">1. Biaya Pendaftaran (Gratis)</option>
+                                        <option value="2. Uang Kaos Olahraga">2. Uang Kaos Olahraga (Rp 160.000)</option>
+                                        <option value="3. Uang Buku Rapor">3. Uang Buku Rapor (Rp 100.000)</option>
+                                        <option value="4. Uang Buku Paket / LKS">4. Uang Buku Paket / LKS (Rp 100.000)</option>
+                                        <option value="5. Uang Foto">5. Uang Foto (Rp 20.000)</option>
+                                        <option value="6. Uang Kegiatan Eskul">6. Uang Kegiatan Eskul (Rp 50.000)</option>
+                                        <option value="7. Uang Wakaf Pengembangan Madrasah">7. Uang Wakaf Pengembangan Madrasah (ZISWAF)</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+
+                            {/* Catatan Pembayaran */}
+                            <div className="space-y-1.5">
+                                <label htmlFor="edit_catatan" className="text-xs font-bold text-slate-500 uppercase tracking-widest block">
+                                    Catatan / Keterangan Pembayaran
+                                </label>
+                                <textarea
+                                    id="edit_catatan"
+                                    value={editCatatan}
+                                    onChange={(e) => setEditCatatan(e.target.value)}
+                                    placeholder="Contoh: Pembayaran tunai via bendahara madrasah / Koreksi nominal..."
+                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                    rows="3"
+                                ></textarea>
+                            </div>
+
+                            {/* Toggle Kirim Notifikasi WA */}
+                            <div className="flex items-center justify-between rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 bg-slate-50 dark:bg-slate-900">
+                                <div>
+                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">📲 Kirim Notifikasi WA ke Wali</p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">Kirim info pembaruan ke {editingPendaftaran.no_hp_wali || 'nomor wali'}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    id="toggle-edit-notif-wa"
+                                    onClick={() => setEditKirimNotifWa(!editKirimNotifWa)}
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                                        editKirimNotifWa ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
+                                    }`}
+                                >
+                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                                        editKirimNotifWa ? 'translate-x-4.5' : 'translate-x-0.5'
+                                    }`} />
+                                </button>
+                            </div>
+
+                            {/* Modal Buttons */}
+                            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                <button
+                                    type="button"
+                                    onClick={closeEditModal}
+                                    disabled={isSubmittingEdit}
+                                    className="rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    id="btn-simpan-edit-pembayaran"
+                                    disabled={isSubmittingEdit}
+                                    className={`inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-all ${
+                                        isSubmittingEdit ? 'opacity-70 cursor-not-allowed' : ''
+                                    }`}
+                                >
+                                    {isSubmittingEdit ? (
+                                        <>
+                                            <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                            </svg>
+                                            Menyimpan...
+                                        </>
+                                    ) : (
+                                        'Simpan Perubahan'
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </AuthenticatedLayout>
     );
 }

@@ -24,6 +24,10 @@ export default function Register() {
     const submit = (e) => {
         e.preventDefault();
 
+        if (data.password.length < 8) {
+            return;
+        }
+
         post(route('register'), {
             onFinish: () => reset('password', 'password_confirmation'),
         });
@@ -108,7 +112,13 @@ export default function Register() {
                             type={showPassword ? 'text' : 'password'}
                             name="password"
                             value={data.password}
-                            className="block w-full pr-10 border-slate-200 focus:border-[#99CC33] focus:ring-[#99CC33]"
+                            className={`block w-full pr-10 border-slate-200 focus:border-[#99CC33] focus:ring-[#99CC33] ${
+                                data.password.length > 0
+                                    ? data.password.length >= 8
+                                        ? 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-500'
+                                        : 'border-rose-300 focus:border-rose-500 focus:ring-rose-500'
+                                    : ''
+                            }`}
                             autoComplete="new-password"
                             onChange={(e) => setData('password', e.target.value)}
                             required
@@ -132,7 +142,32 @@ export default function Register() {
                         </button>
                     </div>
 
-                    <InputError message={errors.password} className="mt-2" />
+                    {/* Teks Peringatan / Helper Text Real-Time Password Minimal 8 Karakter */}
+                    <div className="mt-1.5 flex items-center gap-1.5 text-xs transition-all duration-200">
+                        {data.password.length > 0 ? (
+                            data.password.length >= 8 ? (
+                                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                                    <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Password minimal 8 karakter (Terpenuhi: {data.password.length} karakter)
+                                </span>
+                            ) : (
+                                <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-semibold">
+                                    <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    Password minimal 8 karakter (Kurang {8 - data.password.length} karakter lagi)
+                                </span>
+                            )
+                        ) : (
+                            <span className="text-slate-400 text-xs">
+                                ℹ️ Password minimal 8 karakter
+                            </span>
+                        )}
+                    </div>
+
+                    <InputError message={errors.password} className="mt-1.5" />
                 </div>
 
                 <div>
@@ -189,9 +224,9 @@ export default function Register() {
                     </Link>
 
                     <PrimaryButton
-                        className="font-extrabold text-sm px-6 py-2.5 rounded-xl transition-all hover:-translate-y-0.5"
+                        className="font-extrabold text-sm px-6 py-2.5 rounded-xl transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                         style={{ background: '#003333', color: '#99CC33', boxShadow: '0 4px 12px rgba(0,51,51,0.25)' }}
-                        disabled={processing}
+                        disabled={processing || data.password.length < 8}
                     >
                         Daftar Akun
                     </PrimaryButton>
