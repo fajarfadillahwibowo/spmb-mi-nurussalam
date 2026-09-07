@@ -142,8 +142,8 @@ Route::get('/informasi-spmb', function () {
 Route::get('/dashboard', function (Request $request) {
     $user = Auth::user();
 
-    if ($user->role === 'admin') {
-        // ─── Dashboard Admin: Statistik Rekap Pendaftaran ────────────────────
+    if ($user->role === 'admin' || $user->role === 'kepala_sekolah') {
+        // ─── Dashboard Admin / Supervisor: Statistik Rekap Pendaftaran ──────
 
         // [BARU] Filter periode — gunakan periode aktif jika tidak ada pilihan eksplisit
         $periodeId = $request->query('periode_id');
@@ -160,7 +160,8 @@ Route::get('/dashboard', function (Request $request) {
         }
 
         return Inertia::render('Dashboard', [
-            'role'  => 'admin',
+            'role'       => $user->role,
+            'isReadOnly' => $user->role === 'kepala_sekolah',
             'stats' => [
                 'total'       => (clone $baseQuery)->count(),
                 'lulus'       => (clone $baseQuery)->where('status', 'lulus')->count(),
@@ -194,7 +195,7 @@ Route::get('/dashboard', function (Request $request) {
 // 3. AUTHENTICATED ROUTES — Memerlukan login & verifikasi email
 // =============================================================================
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'verified', 'read.only'])->group(function () {
 
     // ─── Siswa: Pendaftaran (Pengisian Biodata) ───────────────────────────────
     Route::get('/pendaftaran', [PendaftaranController::class, 'index'])->name('pendaftaran.index');
@@ -203,6 +204,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ─── Siswa: Unggah Dokumen Persyaratan ───────────────────────────────────
     Route::get('/dokumen', [DokumenController::class, 'index'])->name('dokumen.index');
     Route::post('/dokumen', [DokumenController::class, 'store'])->name('dokumen.store');
+    Route::delete('/dokumen', [DokumenController::class, 'destroy'])->name('dokumen.destroy');
 
     // ─── Siswa: Halaman Pengumuman Hasil Seleksi ──────────────────────────────
     Route::get('/pengumuman', function () {
@@ -297,7 +299,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/pembayaran-admin', function (Request $request) {
         $user = Auth::user();
 
-        if ($user->role !== 'admin') {
+        if (! in_array($user->role, ['admin', 'kepala_sekolah'], true)) {
             abort(403);
         }
 
@@ -637,7 +639,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/data-pendaftar', function (Request $request) {
         $user = Auth::user();
 
-        if ($user->role !== 'admin') {
+        if (! in_array($user->role, ['admin', 'kepala_sekolah'], true)) {
             abort(403);
         }
 
@@ -700,7 +702,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/verifikasi-berkas', function (Request $request) {
         $user = Auth::user();
 
-        if ($user->role !== 'admin') {
+        if (! in_array($user->role, ['admin', 'kepala_sekolah'], true)) {
             abort(403);
         }
 
@@ -775,7 +777,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/pengumuman-admin', function (Request $request) {
         $user = Auth::user();
 
-        if ($user->role !== 'admin') {
+        if (! in_array($user->role, ['admin', 'kepala_sekolah'], true)) {
             abort(403);
         }
 
@@ -846,7 +848,7 @@ require __DIR__ . '/auth.php';
 // Tidak ada kode existing yang dimodifikasi untuk menambahkan blok ini.
 // =============================================================================
 
-Route::middleware(['auth', 'verified'])
+Route::middleware(['auth', 'verified', 'role:admin'])
     ->prefix('pengaturan')
     ->name('pengaturan.')
     ->group(function () {

@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, router, Link } from '@inertiajs/react';
+import { Head, router, Link, usePage } from '@inertiajs/react';
 import React, { useState, useEffect, useRef } from 'react';
 import Swal from 'sweetalert2';
 import gsap from 'gsap';
@@ -11,6 +11,9 @@ import EmailStatusBadge from '@/Components/EmailStatusBadge';
 gsap.registerPlugin(ScrollTrigger);
 
 export default function AdminPembayaran({ pendaftarans, filters, flash_status, flash_error, periodes = [], selectedPeriodeId = null }) {
+    const { user } = usePage().props.auth;
+    const isKepalaSekolah = user?.role === 'kepala_sekolah';
+
     const [search, setSearch] = useState(filters?.search || '');
     const [status, setStatus] = useState(filters?.status || '');
     const [activePendaftaran, setActivePendaftaran] = useState(null);
@@ -242,13 +245,31 @@ export default function AdminPembayaran({ pendaftarans, filters, flash_status, f
             <Head title="Verifikasi Pembayaran | SPMB Admin" />
 
             <div className="space-y-6">
-                {/* Filter Periode — [BARU] */}
+                {/* Filter Periode */}
                 <PeriodeFilterBar
                     periodes={periodes}
                     selectedPeriode={selectedPeriodeId}
                     routeName="pembayaran-admin.index"
                     extraParams={{ search: filters?.search, status: filters?.status }}
                 />
+
+                {/* Banner Mode Pengawas (Kepala Sekolah) */}
+                {isKepalaSekolah && (
+                    <div className="flex items-center justify-between p-4 bg-amber-50 border-l-4 border-amber-500 rounded-2xl shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <span className="p-2 bg-amber-100 text-amber-800 rounded-xl text-lg font-bold">🛡️</span>
+                            <div>
+                                <h4 className="text-sm font-extrabold text-amber-950">Mode Pengawas: Riwayat & Status Pembayaran (Read-Only)</h4>
+                                <p className="text-xs text-amber-800 font-medium mt-0.5">
+                                    Hak akses Anda bersifat memantau dan mengaudit bukti transfer. Aksi verifikasi, approval, dan koreksi pembayaran hanya dapat dilakukan oleh Administrator.
+                                </p>
+                            </div>
+                        </div>
+                        <span className="hidden sm:inline-flex text-[11px] font-extrabold uppercase tracking-wider bg-amber-200/80 text-amber-900 px-3 py-1 rounded-full">
+                            Read-Only Active
+                        </span>
+                    </div>
+                )}
 
                 {flash_status && (
                     <div className="rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50">
@@ -380,18 +401,20 @@ export default function AdminPembayaran({ pendaftarans, filters, flash_status, f
                                                                 </button>
                                                             ) : null}
 
-                                                            <button
-                                                                id={`btn-edit-${p.id}`}
-                                                                onClick={() => openEditModal(p)}
-                                                                disabled={isSubmitting || isSubmittingEdit}
-                                                                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 px-3 py-1.5 text-xs font-bold transition-all shadow-sm"
-                                                                title="Edit / Koreksi Data Pembayaran"
-                                                            >
-                                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-                                                                </svg>
-                                                                Edit
-                                                            </button>
+                                                            {!isKepalaSekolah && (
+                                                                <button
+                                                                    id={`btn-edit-${p.id}`}
+                                                                    onClick={() => openEditModal(p)}
+                                                                    disabled={isSubmitting || isSubmittingEdit}
+                                                                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 px-3 py-1.5 text-xs font-bold transition-all shadow-sm"
+                                                                    title="Edit / Koreksi Data Pembayaran"
+                                                                >
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                                                    </svg>
+                                                                    Edit
+                                                                </button>
+                                                            )}
                                                         </div>
 
                                                         {/* Indikator Status WA & Email Pembayaran */}
@@ -520,169 +543,198 @@ export default function AdminPembayaran({ pendaftarans, filters, flash_status, f
                             </div>
                         </div>
 
-                        {/* Decision Form */}
-                        <form onSubmit={handleConfirm} className="space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Tindakan</label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => setAction('approve')}
-                                        className={`rounded-xl border p-2.5 text-center text-xs font-bold transition-all ${
-                                            action === 'approve'
-                                                ? 'border-emerald-600 bg-emerald-50/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/20'
-                                                : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900'
-                                        }`}
-                                    >
-                                        Terima / Setujui
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setAction('reject')}
-                                        className={`rounded-xl border p-2.5 text-center text-xs font-bold transition-all ${
-                                            action === 'reject'
-                                                ? 'border-rose-600 bg-rose-50/30 text-rose-700 dark:text-rose-450 ring-1 ring-rose-500/20'
-                                                : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900'
-                                        }`}
-                                    >
-                                        Tolak Bukti
-                                    </button>
+                        {/* Decision Form or Read-Only Inspection */}
+                        {isKepalaSekolah ? (
+                            <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 space-y-3 dark:border-amber-900/60 dark:bg-amber-950/30">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-base">🛡️</span>
+                                    <h4 className="text-xs font-extrabold text-amber-900 dark:text-amber-300 uppercase tracking-wider">Mode Pengawas (Read-Only)</h4>
                                 </div>
-                            </div>
-
-                            {action === 'approve' && (
-                                <>
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Status Baru</label>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <button
-                                                type="button"
-                                                onClick={() => setNewStatus('lunas')}
-                                                className={`rounded-xl border p-2 text-center text-xs font-bold transition-all ${
-                                                    newStatus === 'lunas'
-                                                        ? 'border-emerald-600 bg-emerald-50/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/20'
-                                                        : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900'
-                                                }`}
-                                            >
-                                                Set Lunas
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setNewStatus('cicilan')}
-                                                className={`rounded-xl border p-2 text-center text-xs font-bold transition-all ${
-                                                    newStatus === 'cicilan'
-                                                        ? 'border-emerald-600 bg-emerald-50/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/20'
-                                                        : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900'
-                                                }`}
-                                            >
-                                                Set Cicilan
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Jenis Pembayaran — dikirim ke backend untuk pesan WA */}
-                                    <div className="space-y-1">
-                                        <label htmlFor="jenis_pembayaran" className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Jenis Pembayaran</label>
-                                        <select
-                                            id="jenis_pembayaran"
-                                            value={jenisPembayaran}
-                                            onChange={(e) => setJenisPembayaran(e.target.value)}
-                                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 font-bold"
-                                        >
-                                            <optgroup label="Paket Pembayaran">
-                                                <option value="Total Biaya Masuk (Semua Komponen)">Total Biaya Masuk (Semua Komponen)</option>
-                                                <option value="Cicilan Biaya Masuk">Cicilan Biaya Masuk</option>
-                                            </optgroup>
-                                            <optgroup label="Rincian Komponen Biaya (7 Komponen)">
-                                                <option value="1. Biaya Pendaftaran">1. Biaya Pendaftaran (Gratis)</option>
-                                                <option value="2. Uang Kaos Olahraga">2. Uang Kaos Olahraga (Rp 160.000)</option>
-                                                <option value="3. Uang Buku Rapor">3. Uang Buku Rapor (Rp 100.000)</option>
-                                                <option value="4. Uang Buku Paket / LKS">4. Uang Buku Paket / LKS (Rp 100.000)</option>
-                                                <option value="5. Uang Foto">5. Uang Foto (Rp 20.000)</option>
-                                                <option value="6. Uang Kegiatan Eskul">6. Uang Kegiatan Eskul (Rp 50.000)</option>
-                                                <option value="7. Uang Wakaf Pengembangan Madrasah">7. Uang Wakaf Pengembangan Madrasah (ZISWAF)</option>
-                                            </optgroup>
-                                        </select>
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <label htmlFor="verified_amount" className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Nominal Pembayaran Diterima (Rp)</label>
-                                        <div className="relative mt-1">
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
-                                            <input
-                                                id="verified_amount"
-                                                type="number"
-                                                value={verifiedAmount}
-                                                onChange={(e) => setVerifiedAmount(e.target.value)}
-                                                placeholder="Masukkan nominal yang valid"
-                                                className="w-full pl-8 pr-4 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-800 bg-white focus:border-emerald-500 focus:outline-none dark:bg-slate-900 font-bold"
-                                                required
-                                            />
-                                        </div>
-                                        <span className="text-[10px] text-slate-400 font-semibold block mt-1">
-                                            Calon siswa mengklaim transfer sebesar: <strong className="text-slate-700 dark:text-slate-300">{formatRupiah(activePendaftaran.amount_paid)}</strong>
+                                <p className="text-xs text-amber-800 dark:text-amber-400 leading-relaxed font-medium">
+                                    Anda sedang meninjau bukti pembayaran calon siswa <strong>{activePendaftaran.nama_lengkap}</strong>. Form persetujuan atau penolakan bukti transfer hanya dapat diproses oleh Administrator.
+                                </p>
+                                <div className="pt-3 border-t border-amber-200/70 dark:border-amber-800/50 space-y-2 text-xs">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-slate-500 font-semibold">Status Pembayaran:</span>
+                                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold uppercase ${getStatusBadge(activePendaftaran.payment_status)}`}>
+                                            {activePendaftaran.payment_status}
                                         </span>
                                     </div>
-
-                                    {/* Toggle Kirim Notifikasi WA */}
-                                    <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-800 p-3 bg-slate-50 dark:bg-slate-900">
-                                        <div>
-                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200">📲 Kirim Notifikasi WA</p>
-                                            <p className="text-[10px] text-slate-400 mt-0.5">Otomatis kirim pesan ke {activePendaftaran.no_hp_wali || 'nomor wali'}</p>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-slate-500 font-semibold">Nominal Terdaftar:</span>
+                                        <span className="font-extrabold text-emerald-700 dark:text-emerald-400">
+                                            Rp {Number(activePendaftaran.amount_paid || 0).toLocaleString('id-ID')}
+                                        </span>
+                                    </div>
+                                    {activePendaftaran.catatan_pembayaran && (
+                                        <div className="pt-1.5">
+                                            <span className="text-slate-500 font-semibold block mb-1">Catatan Terakhir:</span>
+                                            <p className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-amber-100 dark:border-amber-900/40 text-slate-700 dark:text-slate-300 italic text-[11px]">
+                                                {activePendaftaran.catatan_pembayaran}
+                                            </p>
                                         </div>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleConfirm} className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Tindakan</label>
+                                    <div className="grid grid-cols-2 gap-3">
                                         <button
                                             type="button"
-                                            id="toggle-notif-wa"
-                                            onClick={() => setKirimNotifWa(!kirimNotifWa)}
-                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                                                kirimNotifWa ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
+                                            onClick={() => setAction('approve')}
+                                            className={`rounded-xl border p-2.5 text-center text-xs font-bold transition-all ${
+                                                action === 'approve'
+                                                    ? 'border-emerald-600 bg-emerald-50/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/20'
+                                                    : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900'
                                             }`}
                                         >
-                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-                                                kirimNotifWa ? 'translate-x-4.5' : 'translate-x-0.5'
-                                            }`} />
+                                            Terima / Setujui
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setAction('reject')}
+                                            className={`rounded-xl border p-2.5 text-center text-xs font-bold transition-all ${
+                                                action === 'reject'
+                                                    ? 'border-rose-600 bg-rose-50/30 text-rose-700 dark:text-rose-450 ring-1 ring-rose-500/20'
+                                                    : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900'
+                                            }`}
+                                        >
+                                            Tolak Bukti
                                         </button>
                                     </div>
-                                </>
-                            )}
+                                </div>
 
+                                {action === 'approve' && (
+                                    <>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Status Baru</label>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setNewStatus('lunas')}
+                                                    className={`rounded-xl border p-2 text-center text-xs font-bold transition-all ${
+                                                        newStatus === 'lunas'
+                                                            ? 'border-emerald-600 bg-emerald-50/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/20'
+                                                            : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900'
+                                                    }`}
+                                                >
+                                                    Set Lunas
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setNewStatus('cicilan')}
+                                                    className={`rounded-xl border p-2 text-center text-xs font-bold transition-all ${
+                                                        newStatus === 'cicilan'
+                                                            ? 'border-emerald-600 bg-emerald-50/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/20'
+                                                            : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900'
+                                                    }`}
+                                                >
+                                                    Set Cicilan
+                                                </button>
+                                            </div>
+                                        </div>
 
-                            <div className="space-y-1">
-                                <label htmlFor="catatan" className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Catatan / Alasan</label>
-                                <textarea
-                                    id="catatan"
-                                    value={catatan}
-                                    onChange={(e) => setCatatan(e.target.value)}
-                                    placeholder={action === 'approve' ? 'Catatan verifikasi (misal: Transfer lunas bank BSI)' : 'Alasan penolakan bukti transfer (wajib diisi)...'}
-                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-                                    rows="3"
-                                    required={action === 'reject'}
-                                ></textarea>
-                            </div>
+                                        {/* Jenis Pembayaran — dikirim ke backend untuk pesan WA */}
+                                        <div className="space-y-1">
+                                            <label htmlFor="jenis_pembayaran" className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Jenis Pembayaran</label>
+                                            <select
+                                                id="jenis_pembayaran"
+                                                value={jenisPembayaran}
+                                                onChange={(e) => setJenisPembayaran(e.target.value)}
+                                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 font-bold"
+                                            >
+                                                <optgroup label="Paket Pembayaran">
+                                                    <option value="Total Biaya Masuk (Semua Komponen)">Total Biaya Masuk (Semua Komponen)</option>
+                                                    <option value="Cicilan Biaya Masuk">Cicilan Biaya Masuk</option>
+                                                </optgroup>
+                                                <optgroup label="Rincian Komponen Biaya (7 Komponen)">
+                                                    <option value="1. Biaya Pendaftaran">1. Biaya Pendaftaran (Gratis)</option>
+                                                    <option value="2. Uang Kaos Olahraga">2. Uang Kaos Olahraga (Rp 160.000)</option>
+                                                    <option value="3. Uang Buku Rapor">3. Uang Buku Rapor (Rp 100.000)</option>
+                                                    <option value="4. Uang Buku Paket / LKS">4. Uang Buku Paket / LKS (Rp 100.000)</option>
+                                                    <option value="5. Uang Foto">5. Uang Foto (Rp 20.000)</option>
+                                                    <option value="6. Uang Kegiatan Eskul">6. Uang Kegiatan Eskul (Rp 50.000)</option>
+                                                    <option value="7. Uang Wakaf Pengembangan Madrasah">7. Uang Wakaf Pengembangan Madrasah (ZISWAF)</option>
+                                                </optgroup>
+                                            </select>
+                                        </div>
 
-                            <button
-                                type="submit"
-                                id="btn-simpan-keputusan"
-                                disabled={isSubmitting}
-                                className={`w-full rounded-xl py-2.5 text-xs font-bold text-white transition-all shadow-md ${
-                                    isSubmitting
-                                        ? 'bg-slate-400 cursor-not-allowed shadow-none'
-                                        : action === 'approve'
-                                        ? 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 shadow-emerald-500/10'
-                                        : 'bg-rose-600 hover:bg-rose-500 active:bg-rose-700 shadow-rose-500/10'
-                                }`}
-                            >
-                                {isSubmitting ? (
-                                    <span className="flex items-center justify-center gap-2">
-                                        <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                                        </svg>
-                                        Memproses Verifikasi...
-                                    </span>
-                                ) : 'Simpan Keputusan'}
-                            </button>
-                        </form>
+                                        <div className="space-y-1">
+                                            <label htmlFor="verified_amount" className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Nominal Pembayaran Diterima (Rp)</label>
+                                            <div className="relative mt-1">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                                                <input
+                                                    id="verified_amount"
+                                                    type="number"
+                                                    value={verifiedAmount}
+                                                    onChange={(e) => setVerifiedAmount(e.target.value)}
+                                                    placeholder="Masukkan nominal yang valid"
+                                                    className="w-full pl-8 pr-4 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-800 bg-white focus:border-emerald-500 focus:outline-none dark:bg-slate-900 font-bold"
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Toggle Kirim Notifikasi WhatsApp */}
+                                        <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
+                                            <div className="space-y-0.5">
+                                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Kirim Notifikasi WA</span>
+                                                <span className="text-[10px] text-slate-400 block">Kirim pesan WhatsApp otomatis ke nomor wali</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setKirimNotifWa(!kirimNotifWa)}
+                                                className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                                    kirimNotifWa ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'
+                                                }`}
+                                            >
+                                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                                                    kirimNotifWa ? 'translate-x-4.5' : 'translate-x-0.5'
+                                                }`} />
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+
+                                <div className="space-y-1">
+                                    <label htmlFor="catatan" className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Catatan / Alasan</label>
+                                    <textarea
+                                        id="catatan"
+                                        value={catatan}
+                                        onChange={(e) => setCatatan(e.target.value)}
+                                        placeholder={action === 'approve' ? 'Catatan verifikasi (misal: Transfer lunas bank BSI)' : 'Alasan penolakan bukti transfer (wajib diisi)...'}
+                                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                                        rows="3"
+                                        required={action === 'reject'}
+                                    ></textarea>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    id="btn-simpan-keputusan"
+                                    disabled={isSubmitting}
+                                    className={`w-full rounded-xl py-2.5 text-xs font-bold text-white transition-all shadow-md ${
+                                        isSubmitting
+                                            ? 'bg-slate-400 cursor-not-allowed shadow-none'
+                                            : action === 'approve'
+                                            ? 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 shadow-emerald-500/10'
+                                            : 'bg-rose-600 hover:bg-rose-500 active:bg-rose-700 shadow-rose-500/10'
+                                    }`}
+                                >
+                                    {isSubmitting ? (
+                                        <span className="flex items-center justify-center gap-2">
+                                            <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                            </svg>
+                                            Memproses Verifikasi...
+                                        </span>
+                                    ) : 'Simpan Keputusan'}
+                                </button>
+                            </form>
+                        )}
                     </div>
                 )}
             </div>

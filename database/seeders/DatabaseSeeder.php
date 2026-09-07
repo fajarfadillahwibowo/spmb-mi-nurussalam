@@ -28,6 +28,9 @@ class DatabaseSeeder extends Seeder
         );
 
         // Seed 39 Calon Siswa & Pendaftaran
-        $this->call(CalonSiswaSeeder::class);
+        $this->call([
+            CalonSiswaSeeder::class,
+            KepalaSekolahSeeder::class,
+        ]);
     }
 }

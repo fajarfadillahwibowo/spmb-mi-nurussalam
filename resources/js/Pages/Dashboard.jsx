@@ -222,10 +222,32 @@ export default function Dashboard({ auth, role, pendaftaran, stats, teksPengumum
                         routeName="dashboard"
                     />
 
+                    {/* [BARU] Banner Mode Pengawas Kepala Sekolah */}
+                    {role === 'kepala_sekolah' && (
+                        <div className="flex items-center justify-between p-4 bg-amber-50 border-l-4 border-amber-500 rounded-2xl shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <span className="p-2 bg-amber-100 text-amber-800 rounded-xl text-lg font-bold">🛡️</span>
+                                <div>
+                                    <h4 className="text-sm font-extrabold text-amber-950">Portal Pengawasan Kepala Sekolah (Read-Only)</h4>
+                                    <p className="text-xs text-amber-800 font-medium mt-0.5">
+                                        Anda masuk dalam mode Supervisor untuk mengawasi dan mengaudit rekap pendaftaran, dokumen calon murid, serta riwayat pembayaran secara transparan.
+                                    </p>
+                                </div>
+                            </div>
+                            <span className="hidden sm:inline-flex text-[11px] font-extrabold uppercase tracking-wider bg-amber-200/80 text-amber-900 px-3 py-1 rounded-full">
+                                Pengawas Aktif
+                            </span>
+                        </div>
+                    )}
+
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 rounded-3xl p-6 dark:border-slate-850 dark:bg-slate-950 gsap-fade-down">
                         <div>
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Panel Administrasi Akademik</h3>
-                            <p className="text-sm font-semibold text-slate-500 mt-0.5">Sistem Penerimaan Murid Baru MI Nurussalam Sidogede</p>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                                {role === 'kepala_sekolah' ? 'Panel Pengawasan & Monitoring SPMB' : 'Panel Administrasi Akademik'}
+                            </h3>
+                            <p className="text-sm font-semibold text-slate-500 mt-0.5">
+                                {role === 'kepala_sekolah' ? 'Pengawasan Terpadu Sistem Penerimaan Murid Baru MI Nurussalam' : 'Sistem Penerimaan Murid Baru MI Nurussalam Sidogede'}
+                            </p>
                         </div>
                         {selectedPeriodeId ? (
                             <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200/50 px-3.5 py-1 text-xs font-extrabold text-amber-800">
@@ -299,10 +321,23 @@ export default function Dashboard({ auth, role, pendaftaran, stats, teksPengumum
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 gsap-fade-up">
                         <div className="rounded-3xl border border-slate-200 bg-white p-6 dark:border-slate-850 dark:bg-slate-950 space-y-4">
                             <h4 className="font-bold text-base">Alur Kerja Cepat</h4>
-                            <p className="text-xs text-slate-500 font-semibold leading-relaxed">Evaluasi berkas pendaftar secara berkala pada laman seleksi. Semua data yang disubmit terikat pada integritas MySQL schema.</p>
+                            <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+                                {role === 'kepala_sekolah'
+                                    ? 'Pantau data berkas dan riwayat verifikasi pembayaran pendaftar secara transparan.'
+                                    : 'Evaluasi berkas pendaftar secara berkala pada laman seleksi. Semua data yang disubmit terikat pada integritas MySQL schema.'}
+                            </p>
                             <div className="flex gap-3">
-                                <Link href={route('seleksi.index')} className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 transition-colors shadow-md">Mulai Menyeleksi &rarr;</Link>
-                                <Link href={route('laporan.index')} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">Lihat Laporan</Link>
+                                {role === 'kepala_sekolah' ? (
+                                    <>
+                                        <Link href={route('data-pendaftar.index')} className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 transition-colors shadow-md">Pantau Pendaftar &rarr;</Link>
+                                        <Link href={route('pembayaran-admin.index')} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">Audit Pembayaran</Link>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Link href={route('seleksi.index')} className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 transition-colors shadow-md">Mulai Menyeleksi &rarr;</Link>
+                                        <Link href={route('laporan.index')} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">Lihat Laporan</Link>
+                                    </>
+                                )}
                             </div>
                         </div>
                         <div className="rounded-3xl border border-slate-200 bg-white p-6 dark:border-slate-850 dark:bg-slate-950 flex flex-col justify-center items-center text-center space-y-2">

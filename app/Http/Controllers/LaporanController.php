@@ -34,8 +34,8 @@ class LaporanController extends Controller
      */
     public function index(Request $request): Response
     {
-        // Hanya admin yang berwenang mengakses halaman laporan.
-        if (Auth::user()->role !== 'admin') {
+        // Admin dan Kepala Sekolah berwenang mengakses halaman laporan.
+        if (! in_array(Auth::user()->role, ['admin', 'kepala_sekolah'], true)) {
             abort(403, 'Aksi ditolak.');
         }
 
@@ -107,7 +107,7 @@ class LaporanController extends Controller
      */
     public function exportExcel(Request $request)
     {
-        if (Auth::user()->role !== 'admin') {
+        if (! in_array(Auth::user()->role, ['admin', 'kepala_sekolah'], true)) {
             abort(403, 'Aksi ditolak.');
         }
 

@@ -40,8 +40,8 @@ class SeleksiController extends Controller
      */
     public function index(Request $request): Response
     {
-        // Hanya admin yang berwenang mengakses halaman manajemen seleksi.
-        if (Auth::user()->role !== 'admin') {
+        // Admin dan Kepala Sekolah berwenang mengakses halaman manajemen seleksi.
+        if (! in_array(Auth::user()->role, ['admin', 'kepala_sekolah'], true)) {
             abort(403, 'Aksi ditolak.');
         }
 
@@ -86,7 +86,7 @@ class SeleksiController extends Controller
      */
     public function show(Pendaftaran $pendaftaran): Response
     {
-        if (Auth::user()->role !== 'admin') {
+        if (! in_array(Auth::user()->role, ['admin', 'kepala_sekolah'], true)) {
             abort(403, 'Aksi ditolak.');
         }
 

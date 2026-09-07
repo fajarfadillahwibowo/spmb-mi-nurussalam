@@ -88,4 +88,39 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         // Verifikasi ditangani secara manual melalui OTP di AuthController.
     }
+
+    // ─── Role Helpers ─────────────────────────────────────────────────────────
+
+    /**
+     * Apakah user adalah administrator operasional
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Apakah user adalah Kepala Sekolah (Supervisor / Pengawas)
+     */
+    public function isKepalaSekolah(): bool
+    {
+        return $this->role === 'kepala_sekolah';
+    }
+
+    /**
+     * Apakah user memiliki hak akses pengawasan/supervisor (Admin atau Kepala Sekolah)
+     */
+    public function isSupervisor(): bool
+    {
+        return in_array($this->role, ['admin', 'kepala_sekolah'], true);
+    }
+
+    /**
+     * Apakah user berhak memutasi/mengubah data (Hanya Admin)
+     */
+    public function canMutate(): bool
+    {
+        return $this->role === 'admin';
+    }
 }
+

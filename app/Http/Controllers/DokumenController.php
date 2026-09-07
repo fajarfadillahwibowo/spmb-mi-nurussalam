@@ -114,6 +114,7 @@ class DokumenController extends Controller
 
         // Flag penanda apakah ada minimal satu file yang berhasil diunggah.
         $uploaded = false;
+        $uploadedFields = [];
 
         // ─── Proses Unggah Per-Dokumen ────────────────────────────────────────
         // Pola yang sama diterapkan untuk setiap dokumen:
@@ -127,6 +128,7 @@ class DokumenController extends Controller
             }
             $dokumen->akta_kelahiran_path = $request->file('akta_kelahiran')->store('dokumen', 'public');
             $uploaded = true;
+            $uploadedFields[] = 'Akta Kelahiran';
         }
 
         if ($request->hasFile('kartu_keluarga')) {
@@ -135,6 +137,7 @@ class DokumenController extends Controller
             }
             $dokumen->kartu_keluarga_path = $request->file('kartu_keluarga')->store('dokumen', 'public');
             $uploaded = true;
+            $uploadedFields[] = 'Kartu Keluarga';
         }
 
         if ($request->hasFile('identitas_ortu')) {
@@ -143,6 +146,7 @@ class DokumenController extends Controller
             }
             $dokumen->identitas_ortu_path = $request->file('identitas_ortu')->store('dokumen', 'public');
             $uploaded = true;
+            $uploadedFields[] = 'KTP Orang Tua';
         }
 
         if ($request->hasFile('ijazah')) {
@@ -151,6 +155,7 @@ class DokumenController extends Controller
             }
             $dokumen->ijazah_path = $request->file('ijazah')->store('dokumen', 'public');
             $uploaded = true;
+            $uploadedFields[] = 'Ijazah RA/TK';
         }
 
         if ($request->hasFile('pkh_kks')) {
@@ -159,6 +164,7 @@ class DokumenController extends Controller
             }
             $dokumen->pkh_kks_path = $request->file('pkh_kks')->store('dokumen', 'public');
             $uploaded = true;
+            $uploadedFields[] = 'Kartu PKH/KKS';
         }
 
         // ─── Simpan & Perbarui Status ─────────────────────────────────────────
@@ -181,6 +187,65 @@ class DokumenController extends Controller
         }
 
         return redirect()->route('dokumen.index')->with('error', 'Tidak ada file yang diunggah.');
+    }
+
+    /**
+     * Menghapus file dokumen tertentu milik calon siswa secara mandiri (1 per 1).
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function destroy(Request $request): RedirectResponse
+    {
+        $user = Auth::user();
+
+        if ($user->role !== 'siswa') {
+            abort(403, 'Aksi ditolak.');
+        }
+
+        $pendaftaran = $user->pendaftaran;
+        if (! $pendaftaran || ! $pendaftaran->dokumen) {
+            return redirect()->route('dokumen.index')
+                ->with('error', 'Dokumen tidak ditemukan.');
+        }
+
+        $request->validate([
+            'doc_type' => 'required|string|in:akta_kelahiran_path,kartu_keluarga_path,identitas_ortu_path,ijazah_path,pkh_kks_path',
+        ]);
+
+        $docType = $request->doc_type;
+        $dokumen = $pendaftaran->dokumen;
+
+        $docLabels = [
+            'akta_kelahiran_path' => 'Akta Kelahiran',
+            'kartu_keluarga_path' => 'Kartu Keluarga',
+            'identitas_ortu_path' => 'KTP Orang Tua',
+            'ijazah_path'         => 'Ijazah RA/TK',
+            'pkh_kks_path'        => 'Kartu PKH/KKS',
+        ];
+        $label = $docLabels[$docType] ?? 'Dokumen';
+
+        if (!empty($dokumen->$docType)) {
+            if (Storage::disk('public')->exists($dokumen->$docType)) {
+                Storage::disk('public')->delete($dokumen->$docType);
+            }
+            $dokumen->$docType = '';
+            $dokumen->save();
+        }
+
+        // Periksa kembali kelengkapan dokumen wajib
+        $semuaWajibLengkap = $dokumen->akta_kelahiran_path
+            && $dokumen->kartu_keluarga_path
+            && $dokumen->identitas_ortu_path
+            && $dokumen->ijazah_path;
+
+        if (! $semuaWajibLengkap && $pendaftaran->status === 'menunggu_verifikasi') {
+            $pendaftaran->status = 'belum_lengkap';
+            $pendaftaran->save();
+        }
+
+        return redirect()->route('dokumen.index')
+            ->with('status', "Berkas {$label} berhasil dihapus.");
     }
 
     /**

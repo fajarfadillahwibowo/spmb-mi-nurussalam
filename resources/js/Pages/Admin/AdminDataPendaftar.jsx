@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import gsap from 'gsap';
@@ -28,6 +28,9 @@ const QUICK_BIODATA_TEMPLATES = [
 ];
 
 export default function AdminDataPendaftar({ pendaftarans, filters, periodes = [], selectedPeriodeId = null, flash_status, flash_error }) {
+    const { user } = usePage().props.auth;
+    const isKepalaSekolah = user?.role === 'kepala_sekolah';
+
     const [search, setSearch] = useState(filters?.search || '');
     const [gender, setGender] = useState(filters?.gender || '');
 
@@ -268,6 +271,24 @@ export default function AdminDataPendaftar({ pendaftarans, filters, periodes = [
                     extraParams={{ search: filters?.search, gender: filters?.gender }}
                 />
 
+                {/* Banner Mode Pengawas (Kepala Sekolah) */}
+                {isKepalaSekolah && (
+                    <div className="flex items-center justify-between p-4 bg-amber-50 border-l-4 border-amber-500 rounded-2xl shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <span className="p-2 bg-amber-100 text-amber-800 rounded-xl text-lg font-bold">🛡️</span>
+                            <div>
+                                <h4 className="text-sm font-extrabold text-amber-950">Mode Pengawas: Data Pendaftar (Read-Only)</h4>
+                                <p className="text-xs text-amber-800 font-medium mt-0.5">
+                                    Hak akses Anda bersifat memantau dan mengaudit biodata calon murid. Aksi edit data dan pengiriman notifikasi hanya dapat diproses oleh Administrator.
+                                </p>
+                            </div>
+                        </div>
+                        <span className="hidden sm:inline-flex text-[11px] font-extrabold uppercase tracking-wider bg-amber-200/80 text-amber-900 px-3 py-1 rounded-full">
+                            Read-Only Active
+                        </span>
+                    </div>
+                )}
+
                 {/* Flash Success Message */}
                 {flash_status && (
                     <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-5 py-4 text-sm font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
@@ -490,7 +511,7 @@ export default function AdminDataPendaftar({ pendaftarans, filters, periodes = [
                                                 {/* Aksi */}
                                                 <td className="px-4 py-4">
                                                     <div className="flex items-center justify-center gap-1.5">
-                                                        {/* Detail */}
+                                                         {/* Detail */}
                                                         <button
                                                             type="button"
                                                             onClick={() => setDetailPendaftar(p)}
@@ -503,29 +524,33 @@ export default function AdminDataPendaftar({ pendaftarans, filters, periodes = [
                                                             </svg>
                                                         </button>
 
-                                                        {/* Edit */}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => openEditModal(p)}
-                                                            className="rounded-lg bg-blue-50 p-2 text-blue-600 hover:bg-blue-600 hover:text-white dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-600 dark:hover:text-white transition-all active:scale-95"
-                                                            title="Edit / Koreksi Biodata"
-                                                        >
-                                                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-                                                            </svg>
-                                                        </button>
+                                                        {!isKepalaSekolah && (
+                                                            <>
+                                                                {/* Edit */}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openEditModal(p)}
+                                                                    className="rounded-lg bg-blue-50 p-2 text-blue-600 hover:bg-blue-600 hover:text-white dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-600 dark:hover:text-white transition-all active:scale-95"
+                                                                    title="Edit / Koreksi Biodata"
+                                                                >
+                                                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                                                    </svg>
+                                                                </button>
 
-                                                        {/* Notifikasi Minta Perbarui */}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => openNotifModal(p)}
-                                                            className="rounded-lg bg-amber-50 p-2 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-950/40 dark:text-amber-400 dark:hover:bg-amber-600 dark:hover:text-white transition-all active:scale-95"
-                                                            title="Kirim Notifikasi Perbarui Biodata ke Siswa"
-                                                        >
-                                                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-                                                            </svg>
-                                                        </button>
+                                                                {/* Notifikasi Minta Perbarui */}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openNotifModal(p)}
+                                                                    className="rounded-lg bg-amber-50 p-2 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-950/40 dark:text-amber-400 dark:hover:bg-amber-600 dark:hover:text-white transition-all active:scale-95"
+                                                                    title="Kirim Notifikasi Perbarui Biodata ke Siswa"
+                                                                >
+                                                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+                                                                    </svg>
+                                                                </button>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -660,20 +685,22 @@ export default function AdminDataPendaftar({ pendaftarans, filters, periodes = [
 
                         {/* Footer */}
                         <div className="flex items-center justify-end gap-3 pt-5 mt-5 border-t border-slate-100 dark:border-slate-850">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const p = detailPendaftar;
-                                    setDetailPendaftar(null);
-                                    openEditModal(p);
-                                }}
-                                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 text-xs font-bold shadow-md shadow-blue-500/20"
-                            >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-                                </svg>
-                                <span>Edit Data Ini</span>
-                            </button>
+                            {!isKepalaSekolah && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const p = detailPendaftar;
+                                        setDetailPendaftar(null);
+                                        openEditModal(p);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 text-xs font-bold shadow-md shadow-blue-500/20"
+                                >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                    </svg>
+                                    <span>Edit Data Ini</span>
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 onClick={() => setDetailPendaftar(null)}

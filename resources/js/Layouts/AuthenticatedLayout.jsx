@@ -199,6 +199,21 @@ export default function AuthenticatedLayout({ header, children }) {
                         <span className="text-[9px]">{isSiswa ? 'Dokumen' : 'Verifikasi'}</span>
                     </Link>
 
+                    {/* Pembayaran */}
+                    <Link
+                        href={isSiswa ? route('pembayaran.index') : route('pembayaran-admin.index')}
+                        className="flex flex-col items-center gap-0.5 py-1 px-1.5 rounded-xl transition-all"
+                        style={bottomNavActive(['pembayaran', 'pembayaran-admin'])}
+                    >
+                        <div className="relative flex justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="h-[18px] w-[18px]">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+                            </svg>
+                            {(isActive('pembayaran') || isActive('pembayaran-admin')) && <div className="absolute -inset-1 -z-10 rounded-full blur-sm" style={{ background: 'rgba(153,204,51,0.25)' }} />}
+                        </div>
+                        <span className="text-[9px]">Bayar</span>
+                    </Link>
+
                     {/* Seleksi */}
                     <Link
                         href={isSiswa ? route('seleksi-siswa.index') : route('seleksi.index')}
@@ -233,21 +248,6 @@ export default function AuthenticatedLayout({ header, children }) {
                             {(isActive('pengumuman') || isActive('pengumuman-admin')) && <div className="absolute -inset-1 -z-10 rounded-full blur-sm" style={{ background: 'rgba(153,204,51,0.25)' }} />}
                         </div>
                         <span className="text-[9px]">Info</span>
-                    </Link>
-
-                    {/* Pembayaran */}
-                    <Link
-                        href={isSiswa ? route('pembayaran.index') : route('pembayaran-admin.index')}
-                        className="flex flex-col items-center gap-0.5 py-1 px-1.5 rounded-xl transition-all"
-                        style={bottomNavActive(['pembayaran', 'pembayaran-admin'])}
-                    >
-                        <div className="relative flex justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="h-[18px] w-[18px]">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
-                            </svg>
-                            {(isActive('pembayaran') || isActive('pembayaran-admin')) && <div className="absolute -inset-1 -z-10 rounded-full blur-sm" style={{ background: 'rgba(153,204,51,0.25)' }} />}
-                        </div>
-                        <span className="text-[9px]">Bayar</span>
                     </Link>
 
                     {/* Laporan — Admin Only */}

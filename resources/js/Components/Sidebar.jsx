@@ -98,6 +98,8 @@ function PengaturanSubMenu({ isActive, linkClasses, activeLinkStyle, inactiveLin
 export default function Sidebar({ user, currentRoute, isOpen, toggleSidebar }) {
     const isSiswa = user.role === 'siswa';
     const isAdmin = user.role === 'admin';
+    const isKepalaSekolah = user.role === 'kepala_sekolah';
+    const isSupervisor = isAdmin || isKepalaSekolah;
 
     const isActive = (routePattern) => {
         if (routePattern === 'dashboard') return currentRoute === 'dashboard';
@@ -168,7 +170,9 @@ export default function Sidebar({ user, currentRoute, isOpen, toggleSidebar }) {
                         <div>
                             <span className="block text-sm font-extrabold text-white truncate max-w-[150px]">{user.username}</span>
                             <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#99CC33' }}>
-                                {user.role === 'admin' ? 'Operator Sekolah' : 'Calon Siswa'}
+                                {isAdmin && 'Operator Sekolah'}
+                                {isKepalaSekolah && 'Kepala Sekolah (Pengawas)'}
+                                {isSiswa && 'Calon Siswa'}
                             </span>
                         </div>
                     </div>
@@ -196,45 +200,91 @@ export default function Sidebar({ user, currentRoute, isOpen, toggleSidebar }) {
                     {/* Siswa Paths */}
                     {isSiswa && (
                         <>
-                            <Link href={route('pendaftaran.index')} className={linkClasses(isActive('pendaftaran'))} style={isActive('pendaftaran') ? activeLinkStyle : inactiveLinkStyle}>
+                            <div className="pt-3 pb-1 px-4">
+                                <span className="text-[9px] font-black uppercase tracking-wider block" style={{ color: '#99CC33' }}>
+                                    Alur Pendaftaran SPMB
+                                </span>
+                            </div>
+
+                            {/* Langkah 1: Formulir Biodata */}
+                            <Link
+                                href={route('pendaftaran.index')}
+                                className={linkClasses(isActive('pendaftaran'))}
+                                style={isActive('pendaftaran') ? activeLinkStyle : inactiveLinkStyle}
+                            >
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-5 w-5 shrink-0">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                                 </svg>
-                                Pendaftaran
+                                <div className="flex flex-col min-w-0">
+                                    <span className="truncate">Formulir Pendaftaran</span>
+                                    <span className="text-[10px] font-normal text-white/50 -mt-0.5">Langkah 1 • Isi Biodata</span>
+                                </div>
                             </Link>
 
-                            <Link href={route('dokumen.index')} className={linkClasses(isActive('dokumen'))} style={isActive('dokumen') ? activeLinkStyle : inactiveLinkStyle}>
+                            {/* Langkah 2: Upload Dokumen */}
+                            <Link
+                                href={route('dokumen.index')}
+                                className={linkClasses(isActive('dokumen'))}
+                                style={isActive('dokumen') ? activeLinkStyle : inactiveLinkStyle}
+                            >
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-5 w-5 shrink-0">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5h10.5a2.25 2.25 0 0 0 2.25-2.25v-10.5A2.25 2.25 0 0 0 16.5 4.5H6.75A2.25 2.25 0 0 0 4.5 6.75v10.5a2.25 2.25 0 0 0 2.25 2.25Z" />
                                 </svg>
-                                Upload Dokumen
+                                <div className="flex flex-col min-w-0">
+                                    <span className="truncate">Upload Dokumen</span>
+                                    <span className="text-[10px] font-normal text-white/50 -mt-0.5">Langkah 2 • Berkas Persyaratan</span>
+                                </div>
                             </Link>
 
-                            <Link href={route('seleksi-siswa.index')} className={linkClasses(isActive('seleksi-siswa'))} style={isActive('seleksi-siswa') ? activeLinkStyle : inactiveLinkStyle}>
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-5 w-5 shrink-0">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                </svg>
-                                Seleksi
-                            </Link>
-
-                            <Link href={route('pengumuman.index')} className={linkClasses(isActive('pengumuman'))} style={isActive('pengumuman') ? activeLinkStyle : inactiveLinkStyle}>
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-5 w-5 shrink-0">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a9.04 9.04 0 0 1-5.714 0M3.181 12.062a18.8 18.8 0 0 1 17.638 0M15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm1.89 3.487A9.04 9.04 0 0 1 12 15a9.04 9.04 0 0 1-4.89-1.513M21 12v6.75A2.25 2.25 0 0 1 18.75 21H5.25A2.25 2.25 0 0 1 3 18.75V12" />
-                                </svg>
-                                Pengumuman
-                            </Link>
-
-                            <Link href={route('pembayaran.index')} className={linkClasses(isActive('pembayaran'))} style={isActive('pembayaran') ? activeLinkStyle : inactiveLinkStyle}>
+                            {/* Langkah 3: Pembayaran */}
+                            <Link
+                                href={route('pembayaran.index')}
+                                className={linkClasses(isActive('pembayaran'))}
+                                style={isActive('pembayaran') ? activeLinkStyle : inactiveLinkStyle}
+                            >
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-5 w-5 shrink-0">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
                                 </svg>
-                                Pembayaran
+                                <div className="flex flex-col min-w-0">
+                                    <span className="truncate">Pembayaran</span>
+                                    <span className="text-[10px] font-normal text-white/50 -mt-0.5">Langkah 3 • Biaya Pendaftaran</span>
+                                </div>
+                            </Link>
+
+                            {/* Langkah 4: Seleksi */}
+                            <Link
+                                href={route('seleksi-siswa.index')}
+                                className={linkClasses(isActive('seleksi-siswa'))}
+                                style={isActive('seleksi-siswa') ? activeLinkStyle : inactiveLinkStyle}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-5 w-5 shrink-0">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                </svg>
+                                <div className="flex flex-col min-w-0">
+                                    <span className="truncate">Seleksi</span>
+                                    <span className="text-[10px] font-normal text-white/50 -mt-0.5">Langkah 4 • Proses Seleksi</span>
+                                </div>
+                            </Link>
+
+                            {/* Langkah 5: Pengumuman */}
+                            <Link
+                                href={route('pengumuman.index')}
+                                className={linkClasses(isActive('pengumuman'))}
+                                style={isActive('pengumuman') ? activeLinkStyle : inactiveLinkStyle}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-5 w-5 shrink-0">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a9.04 9.04 0 0 1-5.714 0M3.181 12.062a18.8 18.8 0 0 1 17.638 0M15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm1.89 3.487A9.04 9.04 0 0 1 12 15a9.04 9.04 0 0 1-4.89-1.513M21 12v6.75A2.25 2.25 0 0 1 18.75 21H5.25A2.25 2.25 0 0 1 3 18.75V12" />
+                                </svg>
+                                <div className="flex flex-col min-w-0">
+                                    <span className="truncate">Pengumuman</span>
+                                    <span className="text-[10px] font-normal text-white/50 -mt-0.5">Langkah 5 • Hasil Kelulusan</span>
+                                </div>
                             </Link>
                         </>
                     )}
 
-                    {/* Admin Paths */}
-                    {isAdmin && (
+                    {/* Supervisor Paths (Admin & Kepala Sekolah) */}
+                    {isSupervisor && (
                         <>
                             <Link href={route('data-pendaftar.index')} className={linkClasses(isActive('data-pendaftar'))} style={isActive('data-pendaftar') ? activeLinkStyle : inactiveLinkStyle}>
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-5 w-5 shrink-0">
@@ -278,8 +328,10 @@ export default function Sidebar({ user, currentRoute, isOpen, toggleSidebar }) {
                                 Pembayaran
                             </Link>
 
-                            {/* ── Pengaturan (BARU — MODULAR) ─────────────────────────── */}
-                            <PengaturanSubMenu isActive={isActive} linkClasses={linkClasses} activeLinkStyle={activeLinkStyle} inactiveLinkStyle={inactiveLinkStyle} />
+                            {/* ── Pengaturan (Hanya Admin) ─────────────────────────── */}
+                            {isAdmin && (
+                                <PengaturanSubMenu isActive={isActive} linkClasses={linkClasses} activeLinkStyle={activeLinkStyle} inactiveLinkStyle={inactiveLinkStyle} />
+                            )}
                         </>
                     )}
                 </nav>

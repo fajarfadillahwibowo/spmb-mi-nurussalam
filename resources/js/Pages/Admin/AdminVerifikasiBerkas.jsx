@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import gsap from 'gsap';
@@ -36,6 +36,9 @@ const QUICK_TEMPLATES = [
 ];
 
 export default function AdminVerifikasiBerkas({ pendaftarans, filters, periodes = [], selectedPeriodeId = null, flash_status, flash_error }) {
+    const { user } = usePage().props.auth;
+    const isKepalaSekolah = user?.role === 'kepala_sekolah';
+
     const [search, setSearch] = useState(filters?.search || '');
     const [verifikasi, setVerifikasi] = useState(filters?.verifikasi || '');
     const [loadingAction, setLoadingAction] = useState(null);
@@ -259,6 +262,24 @@ export default function AdminVerifikasiBerkas({ pendaftarans, filters, periodes 
                     extraParams={{ search: filters?.search, verifikasi: filters?.verifikasi }}
                 />
 
+                {/* Banner Mode Pengawas (Kepala Sekolah) */}
+                {isKepalaSekolah && (
+                    <div className="flex items-center justify-between p-4 bg-amber-50 border-l-4 border-amber-500 rounded-2xl shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <span className="p-2 bg-amber-100 text-amber-800 rounded-xl text-lg font-bold">🛡️</span>
+                            <div>
+                                <h4 className="text-sm font-extrabold text-amber-950">Mode Pengawas: Verifikasi Berkas (Read-Only)</h4>
+                                <p className="text-xs text-amber-800 font-medium mt-0.5">
+                                    Hak akses Anda bersifat memantau dan mengaudit dokumen persyaratan pendaftar. Aksi penghapusan berkas dan pengiriman notifikasi hanya dapat dilakukan oleh Administrator.
+                                </p>
+                            </div>
+                        </div>
+                        <span className="hidden sm:inline-flex text-[11px] font-extrabold uppercase tracking-wider bg-amber-200/80 text-amber-900 px-3 py-1 rounded-full">
+                            Read-Only Active
+                        </span>
+                    </div>
+                )}
+
                 {/* Flash Success Message */}
                 {flash_status && (
                     <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-5 py-4 text-sm font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
@@ -403,16 +424,18 @@ export default function AdminVerifikasiBerkas({ pendaftarans, filters, periodes 
                                             </div>
 
                                             {/* Tombol Beri Pemberitahuan / Minta Kirim Ulang */}
-                                            <button
-                                                type="button"
-                                                onClick={() => openNotificationModal(p)}
-                                                className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 text-xs font-bold shadow-sm shadow-amber-500/20 transition-all active:scale-95"
-                                            >
-                                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-                                                </svg>
-                                                <span>Pemberitahuan Berkas</span>
-                                            </button>
+                                            {!isKepalaSekolah && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openNotificationModal(p)}
+                                                    className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 text-xs font-bold shadow-sm shadow-amber-500/20 transition-all active:scale-95"
+                                                >
+                                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+                                                    </svg>
+                                                    <span>Pemberitahuan Berkas</span>
+                                                </button>
+                                            )}
 
                                             {/* Direct WhatsApp button jika ada nomor */}
                                             {p.no_hp_wali && (
@@ -469,26 +492,28 @@ export default function AdminVerifikasiBerkas({ pendaftarans, filters, periodes 
                                                                 <span>Lihat</span>
                                                             </a>
 
-                                                            {/* Tombol Hapus Dokumen */}
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleDeleteSingleDoc(p, doc)}
-                                                                disabled={isDeletingThis}
-                                                                title={`Hapus file ${doc.label}`}
-                                                                className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2 py-1 text-[11px] font-bold text-rose-600 border border-rose-200 hover:bg-rose-600 hover:text-white dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-400 dark:hover:bg-rose-700 dark:hover:text-white transition-all active:scale-95 disabled:opacity-50"
-                                                            >
-                                                                {isDeletingThis ? (
-                                                                    <svg className="h-3 w-3 animate-spin text-rose-600" viewBox="0 0 24 24" fill="none">
-                                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                                    </svg>
-                                                                ) : (
-                                                                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                                                    </svg>
-                                                                )}
-                                                                <span>Hapus</span>
-                                                            </button>
+                                                            {/* Tombol Hapus Dokumen (Admin Saja) */}
+                                                            {!isKepalaSekolah && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteSingleDoc(p, doc)}
+                                                                    disabled={isDeletingThis}
+                                                                    title={`Hapus file ${doc.label}`}
+                                                                    className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2 py-1 text-[11px] font-bold text-rose-600 border border-rose-200 hover:bg-rose-600 hover:text-white dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-400 dark:hover:bg-rose-700 dark:hover:text-white transition-all active:scale-95 disabled:opacity-50"
+                                                                >
+                                                                    {isDeletingThis ? (
+                                                                        <svg className="h-3 w-3 animate-spin text-rose-600" viewBox="0 0 24 24" fill="none">
+                                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                        </svg>
+                                                                    ) : (
+                                                                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                                                        </svg>
+                                                                    )}
+                                                                    <span>Hapus</span>
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 );
